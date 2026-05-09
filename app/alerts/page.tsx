@@ -114,7 +114,16 @@ export default async function AlertsPage({
             const tier = severityTier(hit.detector_name, hit.severity_score)
             const filingUrl = sourceFilingUrl(hit)
             return (
-              <Card key={hit.id}>
+              <Card
+                key={hit.id}
+                className="relative transition-colors hover:bg-muted/40"
+              >
+                {/* Full-card click target. Source-filing anchor below sits above this with z-10. */}
+                <Link
+                  href={`/alerts/${hit.id}`}
+                  aria-label={`View alert details for ${companyLabel(hit)}`}
+                  className="absolute inset-0 z-0 rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                />
                 <CardHeader className="pb-3">
                   <div className="flex flex-wrap items-start justify-between gap-2">
                     <div className="flex flex-wrap items-center gap-2">
@@ -136,18 +145,7 @@ export default async function AlertsPage({
                     </span>
                   </div>
                   <CardTitle className="mt-2 text-lg">
-                    {filingUrl ? (
-                      <a
-                        href={filingUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="hover:underline"
-                      >
-                        {companyLabel(hit)}
-                      </a>
-                    ) : (
-                      companyLabel(hit)
-                    )}
+                    {companyLabel(hit)}
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="pt-0">
@@ -159,16 +157,19 @@ export default async function AlertsPage({
                         {formatSeverity(hit.detector_name, hit.severity_score)}
                       </span>
                     </span>
-                    {filingUrl && (
-                      <a
-                        href={filingUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-primary underline-offset-4 hover:underline"
-                      >
-                        View source filing →
-                      </a>
-                    )}
+                    <span className="flex items-center gap-3">
+                      {filingUrl && (
+                        <a
+                          href={filingUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="relative z-10 underline-offset-4 hover:underline"
+                        >
+                          Source filing →
+                        </a>
+                      )}
+                      <span className="text-primary">View details →</span>
+                    </span>
                   </div>
                 </CardContent>
               </Card>
