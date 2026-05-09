@@ -1,40 +1,31 @@
-"""Parser stub for Goldman Sachs BDC (GSBD) Schedule of Investments.
+"""Parser for Goldman Sachs BDC, Inc. (GSBD) Schedule of Investments.
 
-Status
-------
-NOT YET IMPLEMENTED. Returns empty list; upstream pipeline records
-parse_status='failed' with reason 'parser_not_implemented'.
+Status: implemented and validated against Q1 2026 10-Q (-0.81% vs filing
+total).
 
-Structural notes from filing profile
-------------------------------------
-- GSBD's SoI uses a column layout closer to ARCC than to GBDC. Single
-  `<table>` per section is common, with sections: Debt Investments,
-  Equity Investments, Investment Funds.
-- Investment-type column distinguishes "1st Lien/Senior Secured Debt",
-  "2nd Lien/Senior Secured Debt", "Unsecured Debt", "Preferred Stock",
-  "Common Stock", "Warrants".
-- Numeric columns: Principal, Cost, Fair Value, % of Net Assets.
-- PIK column is separate from the cash interest column.
-- Footnotes use parenthetical numerals; legend defines (1) through (15)
-  approximately. Non-accrual marker needs verification.
+GSBD shares the SoI HTML template with GSCR (both filed via Goldman's same
+inline-XBRL builder), so the actual parsing logic lives in
+``soi_parser_gs_common.parse``. This module supplies only the GSBD-specific
+non-accrual footnote marker so it stays trivial and any future schema drift
+needs only one fix.
 
-Implementation TODO
--------------------
-1. Profile GSBD_10Q.htm header tokens.
-2. Verify column order: ARCC-style (P, C, %NAV, FV) vs. GBDC-style
-   (P, C, %NAV, FV with extra spacer cells).
-3. Identify non-accrual footnote.
-4. Validate FV total vs. filing's reported total (TBD).
+GSBD non-accrual footnote: (12).
+    Footnote text in filing: "(12) The investment is on non-accrual status."
 """
 
 from __future__ import annotations
 
-import logging
 from typing import Any
 
-logger = logging.getLogger(__name__)
+import soi_parser_gs_common as gs
+
+
+_NON_ACCRUAL_FOOTNOTE = "12"
 
 
 def parse(html: str) -> list[dict[str, Any]]:
-    logger.warning("GSBD parser not yet implemented; returning empty list.")
-    return []
+    return gs.parse(
+        html,
+        non_accrual_footnote=_NON_ACCRUAL_FOOTNOTE,
+        fund_label="GSBD",
+    )

@@ -52,6 +52,8 @@ IMPLEMENTED_TICKERS: tuple[str, ...] = (
     "OBDC",   # validated +0.07% of $15,344,201k filing total
     "MAIN",   # validated 0.00% exact match of $5,674,751k filing total
     "GBDC",   # best-effort; -14.58% vs $8,317,245k filing total (see module docstring)
+    "GSBD",   # validated -0.81% Q1 2026, -1.31% Q3 2025; shares parser w/ GSCR
+    "GSCR",   # validated -0.19% Q3 2025, +0.26% Q1 2025; shares parser w/ GSBD
 )
 
 
