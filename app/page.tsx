@@ -1,3 +1,4 @@
+import Link from "next/link"
 import { createClient } from "@/lib/supabase/server"
 import {
   Table,
@@ -55,7 +56,12 @@ export default async function Home() {
                 {(funds ?? []).map((f) => (
                   <TableRow key={f.ticker}>
                     <TableCell className="font-mono font-medium">
-                      {f.ticker}
+                      <Link
+                        href={`/funds/${f.ticker}`}
+                        className="text-primary underline-offset-4 hover:underline"
+                      >
+                        {f.ticker}
+                      </Link>
                     </TableCell>
                     <TableCell>{f.name}</TableCell>
                     <TableCell className="font-mono text-muted-foreground">
