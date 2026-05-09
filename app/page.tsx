@@ -59,6 +59,21 @@ export default async function Home() {
         <p className="mt-4 text-lg text-muted-foreground sm:text-xl">
           The agentic intelligence layer for public private credit
         </p>
+        <div className="mt-4 flex flex-wrap gap-3 text-sm">
+          <Link
+            href="/case-studies"
+            className="text-primary underline-offset-4 hover:underline"
+          >
+            Case studies →
+          </Link>
+          <span className="text-muted-foreground">·</span>
+          <Link
+            href="/alerts"
+            className="text-primary underline-offset-4 hover:underline"
+          >
+            All alerts →
+          </Link>
+        </div>
       </header>
 
       <section className="mb-12">
