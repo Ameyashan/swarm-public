@@ -20,8 +20,16 @@ from __future__ import annotations
 from collections import defaultdict
 from typing import Dict, List, Tuple
 
+from detectors._filters import is_subtotal_name
+
 DETECTOR_NAME = "mark_drift_down"
 THRESHOLD_PCT = 0.05  # 5%
+# Fair-value is stored in THOUSANDS of dollars (the unit BDCs disclose in),
+# so 1_000.0 here means "$1M of prior FV".
+MIN_PRIOR_FV_THOUSANDS = 1_000.0  # $1M floor on prior FV — suppresses
+                                  # unfunded-commitment noise where a position
+                                  # runs from $40k to $0 and produces a 100%
+                                  # "drift" that isn't real distress.
 
 
 def run(observations: List[dict], filing_url_map: Dict[Tuple[str, str], str]) -> List[dict]:
@@ -50,6 +58,8 @@ def run(observations: List[dict], filing_url_map: Dict[Tuple[str, str], str]) ->
         fv = o.get("fair_value")
         if not canon or not fund or not period or fv is None:
             continue
+        if is_subtotal_name(canon):
+            continue  # Defense vs upstream parser leaks (e.g. OBDC subtotals)
         try:
             fv_f = float(fv)
         except (TypeError, ValueError):
@@ -77,6 +87,8 @@ def run(observations: List[dict], filing_url_map: Dict[Tuple[str, str], str]) ->
             if curr_nonaccrual:
                 # Skip — borrower already on non-accrual; not the signal we want
                 continue
+            if fv_prior < MIN_PRIOR_FV_THOUSANDS:
+                continue  # too small to be meaningful
             change_pct = (fv_current - fv_prior) / fv_prior  # negative for drop
             if change_pct >= -THRESHOLD_PCT:
                 continue  # not enough of a drop (or it's an increase)

@@ -50,7 +50,8 @@ def _fetch_observations(sb: Client, page_size: int = 1000) -> List[dict]:
     """Page through ALL observations needed for the detectors."""
     cols = (
         "fund_ticker, period_end, portfolio_company_canonical, "
-        "fair_value, cost, accrual_status, is_pik"
+        "fair_value, cost, accrual_status, is_pik, "
+        "investment_type, principal_amount, maturity_date"
     )
     out: List[dict] = []
     start = 0
