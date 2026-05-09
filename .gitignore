@@ -41,3 +41,6 @@ venv/
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Internal notes
+case_study_candidates.md

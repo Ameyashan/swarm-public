@@ -1,7 +1,9 @@
 "use client"
 
 import { useMemo, useState } from "react"
-import { ArrowDown, ArrowUp, ArrowUpDown, ExternalLink } from "lucide-react"
+import Link from "next/link"
+import { ArrowDown, ArrowUp, ArrowUpDown, ExternalLink, Eye } from "lucide-react"
+import { encodeCanonicalSlug } from "@/lib/slug"
 import { Badge } from "@/components/ui/badge"
 import {
   Select,
@@ -173,25 +175,37 @@ export function ObservationsTable({
             ) : (
               sorted.map((o) => (
                 <TableRow key={o.id}>
-                  <TableCell className="max-w-[260px] truncate font-medium">
-                    {o.source_page_url ? (
-                      <a
-                        href={o.source_page_url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1 text-primary underline-offset-4 hover:underline"
-                        title={o.portfolio_company_raw ?? ""}
-                      >
-                        <span className="truncate">
+                  <TableCell className="max-w-[260px] font-medium">
+                    <div className="flex items-center gap-1.5">
+                      {o.source_page_url ? (
+                        <a
+                          href={o.source_page_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex min-w-0 items-center gap-1 text-primary underline-offset-4 hover:underline"
+                          title={o.portfolio_company_raw ?? ""}
+                        >
+                          <span className="truncate">
+                            {o.portfolio_company_raw ?? "—"}
+                          </span>
+                          <ExternalLink className="h-3 w-3 shrink-0 opacity-60" />
+                        </a>
+                      ) : (
+                        <span className="truncate" title={o.portfolio_company_raw ?? ""}>
                           {o.portfolio_company_raw ?? "—"}
                         </span>
-                        <ExternalLink className="h-3 w-3 shrink-0 opacity-60" />
-                      </a>
-                    ) : (
-                      <span className="truncate" title={o.portfolio_company_raw ?? ""}>
-                        {o.portfolio_company_raw ?? "—"}
-                      </span>
-                    )}
+                      )}
+                      {o.portfolio_company_canonical && (
+                        <Link
+                          href={`/watch/${encodeCanonicalSlug(o.portfolio_company_canonical)}`}
+                          className="shrink-0 text-muted-foreground hover:text-foreground"
+                          title="Watch this borrower"
+                          aria-label="Watch this borrower"
+                        >
+                          <Eye className="h-3.5 w-3.5" />
+                        </Link>
+                      )}
+                    </div>
                   </TableCell>
                   <TableCell className="max-w-[200px] truncate text-muted-foreground">
                     {o.industry ?? "—"}

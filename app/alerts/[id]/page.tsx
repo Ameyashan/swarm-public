@@ -16,6 +16,7 @@ import {
   formatSeverity,
 } from "../alerts-helpers"
 import { CopySummaryButton } from "./copy-summary-button"
+import { encodeCanonicalSlug } from "@/lib/slug"
 
 export const dynamic = "force-dynamic"
 
@@ -320,6 +321,14 @@ export default async function AlertDetailPage({
             <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">
               {companyLabel(hit)}
             </h1>
+            {hit.portfolio_company_canonical && (
+              <Link
+                href={`/watch/${encodeCanonicalSlug(hit.portfolio_company_canonical)}`}
+                className="mt-1 inline-block text-sm text-primary underline-offset-4 hover:underline"
+              >
+                Watch this borrower →
+              </Link>
+            )}
             <p className="mt-2 text-lg text-muted-foreground">
               {summarize(hit)}
             </p>

@@ -30,6 +30,7 @@ export type Observation = {
   fund_ticker: string
   period_end: string
   portfolio_company_raw: string | null
+  portfolio_company_canonical: string | null
   industry: string | null
   investment_type: string | null
   interest_rate_text: string | null
@@ -52,7 +53,7 @@ async function fetchAllObservations(
     const { data, error } = await supabase
       .from("observations")
       .select(
-        "id, filing_id, fund_ticker, period_end, portfolio_company_raw, industry, investment_type, interest_rate_text, interest_rate_pct, fair_value, cost, accrual_status, is_pik, source_page_url"
+        "id, filing_id, fund_ticker, period_end, portfolio_company_raw, portfolio_company_canonical, industry, investment_type, interest_rate_text, interest_rate_pct, fair_value, cost, accrual_status, is_pik, source_page_url"
       )
       .eq("filing_id", filingId)
       .order("fair_value", { ascending: false, nullsFirst: false })

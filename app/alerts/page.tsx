@@ -16,6 +16,7 @@ import {
   companyLabel,
   formatSeverity,
 } from "./alerts-helpers"
+import { encodeCanonicalSlug } from "@/lib/slug"
 
 export const dynamic = "force-dynamic"
 
@@ -158,6 +159,14 @@ export default async function AlertsPage({
                       </span>
                     </span>
                     <span className="flex items-center gap-3">
+                      {hit.portfolio_company_canonical && (
+                        <Link
+                          href={`/watch/${encodeCanonicalSlug(hit.portfolio_company_canonical)}`}
+                          className="relative z-10 underline-offset-4 hover:underline"
+                        >
+                          Watch borrower →
+                        </Link>
+                      )}
                       {filingUrl && (
                         <a
                           href={filingUrl}
