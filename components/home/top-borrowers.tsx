@@ -9,24 +9,32 @@ export type TopBorrower = {
   canonical: string
   fund_count: number
   funds: string[]
-  /** total fair value across all funds, in $ millions */
-  total_fv_m: number
+  /** total fair value across all funds, in whole dollars */
+  total_fv_dollars: number
 }
 
-function formatFv(millions: number): {
+/**
+ * Pick a display unit based on magnitude. We always show 2 sig digits.
+ * Input is whole dollars.
+ */
+function formatFv(dollars: number): {
   value: number
   decimals: number
   prefix: string
   suffix: string
 } {
-  if (millions >= 1000) {
-    return { value: millions / 1000, decimals: 2, prefix: "$", suffix: "B" }
+  const abs = Math.abs(dollars)
+  if (abs >= 1_000_000_000) {
+    return { value: dollars / 1_000_000_000, decimals: 2, prefix: "$", suffix: "B" }
   }
-  return { value: millions, decimals: 1, prefix: "$", suffix: "M" }
+  if (abs >= 1_000_000) {
+    return { value: dollars / 1_000_000, decimals: 1, prefix: "$", suffix: "M" }
+  }
+  return { value: dollars / 1_000, decimals: 0, prefix: "$", suffix: "K" }
 }
 
 function BorrowerCard({ b, index }: { b: TopBorrower; index: number }) {
-  const fv = formatFv(b.total_fv_m)
+  const fv = formatFv(b.total_fv_dollars)
 
   return (
     <motion.div

@@ -174,12 +174,12 @@ export default async function Home() {
     portfolio_company_canonical: string
     fund_count: number
     funds: string[]
-    total_fv_m: number | string
+    total_fv_dollars: number | string
   }>).map((b) => ({
     canonical: b.portfolio_company_canonical,
     fund_count: Number(b.fund_count),
     funds: b.funds ?? [],
-    total_fv_m: Number(b.total_fv_m),
+    total_fv_dollars: Number(b.total_fv_dollars),
   }))
 
   const recentAlerts = recentAlertsRes.data ?? []
@@ -224,7 +224,7 @@ export default async function Home() {
           <LiveStatCard
             value={positions}
             label="Positions tracked"
-            sublabel="Across 9 publicly-traded BDCs"
+            sublabel="Across 6 publicly-traded BDCs"
             accentRgb="16, 185, 129"
           />
           <LiveStatCard
