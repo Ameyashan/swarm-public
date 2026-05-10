@@ -25,6 +25,29 @@ const PAGE_SIZE = 20
 type SearchParams = {
   detector?: string
   page?: string
+  fund?: string
+  quarter?: string
+}
+
+const FUND_TICKERS = ["ARCC", "OBDC", "GBDC", "GSBD", "GSCR", "MAIN"]
+
+/** Add `n` months to a UTC ISO date and return a YYYY-MM-DD string. */
+function addMonthsIso(iso: string, n: number): string | null {
+  const d = new Date(iso + "T00:00:00Z")
+  if (Number.isNaN(d.getTime())) return null
+  const out = new Date(
+    Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + n, d.getUTCDate()),
+  )
+  return out.toISOString().slice(0, 10)
+}
+
+/** Format "2025-04-01" → "Q2 '25". */
+function quarterLabel(iso: string): string {
+  const d = new Date(iso + "T00:00:00Z")
+  if (Number.isNaN(d.getTime())) return iso
+  const q = Math.floor(d.getUTCMonth() / 3) + 1
+  const yy = String(d.getUTCFullYear()).slice(-2)
+  return `Q${q} '${yy}`
 }
 
 export default async function AlertsPage({
@@ -39,6 +62,18 @@ export default async function AlertsPage({
   const from = (pageNum - 1) * PAGE_SIZE
   const to = from + PAGE_SIZE - 1
 
+  const fundFilter =
+    searchParams.fund && FUND_TICKERS.includes(searchParams.fund.toUpperCase())
+      ? searchParams.fund.toUpperCase()
+      : null
+
+  // quarter must be a YYYY-MM-DD ISO string we can parse.
+  const quarterFilter =
+    searchParams.quarter && /^\d{4}-\d{2}-\d{2}$/.test(searchParams.quarter)
+      ? searchParams.quarter
+      : null
+  const quarterEnd = quarterFilter ? addMonthsIso(quarterFilter, 3) : null
+
   const supabase = createClient()
   let query = supabase
     .from("detector_hits")
@@ -51,6 +86,14 @@ export default async function AlertsPage({
 
   if (activeDetector !== "all") {
     query = query.eq("detector_name", activeDetector)
+  }
+  if (fundFilter) {
+    query = query.eq("fund_ticker", fundFilter)
+  }
+  if (quarterFilter && quarterEnd) {
+    query = query
+      .gte("current_period_end", quarterFilter)
+      .lt("current_period_end", quarterEnd)
   }
 
   const { data, error, count } = await query.returns<DetectorHit[]>()
@@ -68,6 +111,15 @@ export default async function AlertsPage({
     const params = new URLSearchParams()
     if (detector !== "all") params.set("detector", detector)
     if (page > 1) params.set("page", String(page))
+    if (fundFilter) params.set("fund", fundFilter)
+    if (quarterFilter) params.set("quarter", quarterFilter)
+    const qs = params.toString()
+    return qs ? `/alerts?${qs}` : "/alerts"
+  }
+
+  function clearFilterHref(): string {
+    const params = new URLSearchParams()
+    if (activeDetector !== "all") params.set("detector", activeDetector)
     const qs = params.toString()
     return qs ? `/alerts?${qs}` : "/alerts"
   }
@@ -90,6 +142,32 @@ export default async function AlertsPage({
           Detector hits across all BDC filings, sorted by most recent.
         </p>
       </header>
+
+      {(fundFilter || quarterFilter) && (
+        <div className="mb-6 flex flex-wrap items-center gap-2">
+          <span className="text-[11px] font-mono uppercase tracking-wider text-dim">
+            Filtered to:
+          </span>
+          <span className="inline-flex items-center gap-2 rounded-full border border-accent bg-accent/10 px-3 py-1 text-xs text-accent">
+            {fundFilter && (
+              <span className="font-mono font-semibold">{fundFilter}</span>
+            )}
+            {fundFilter && quarterFilter && (
+              <span className="text-accent/60">·</span>
+            )}
+            {quarterFilter && (
+              <span className="font-mono">{quarterLabel(quarterFilter)}</span>
+            )}
+            <Link
+              href={clearFilterHref()}
+              aria-label="Clear fund and quarter filter"
+              className="-mr-1 ml-1 rounded-full px-1 text-accent/80 hover:text-accent"
+            >
+              ×
+            </Link>
+          </span>
+        </div>
+      )}
 
       <nav className="mb-8 flex flex-wrap gap-1 border-b border-default">
         {DETECTOR_TABS.map((tab) => {
