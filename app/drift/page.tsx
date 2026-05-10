@@ -11,8 +11,16 @@ import {
   formatSeverity,
 } from "@/app/alerts/alerts-helpers"
 import { cn } from "@/lib/utils"
+import { formatFV, formatPct as fmtPctLib } from "@/lib/format"
 
+import type { Metadata } from "next"
 export const dynamic = "force-dynamic"
+
+export const metadata: Metadata = {
+  title: "Drift screener",
+  description:
+    "Latest fair-value drift across every BDC position — sortable, filterable, with 8-quarter sparklines.",
+}
 
 const PAGE_SIZE = 50
 const SPARK_QUARTERS = 8
@@ -49,7 +57,8 @@ type StatsRow = {
   total_positions: number | string
   count_drop_10: number | string
   count_drop_25: number | string
-  total_at_risk_thousands: number | string
+  // Whole dollars across all funds; the SQL RPC normalizes per-fund scale.
+  total_at_risk_dollars: number | string
 }
 
 const SORT_KEYS = ["change_pct", "change_dollar", "latest_fv", "borrower"] as const
@@ -62,20 +71,15 @@ const SORT_LABELS: Record<SortKey, string> = {
   borrower: "Borrower",
 }
 
-function fmtUsdK(thousands: number | null | undefined): string {
-  if (thousands == null || !Number.isFinite(Number(thousands))) return "—"
-  const t = Number(thousands)
-  const abs = Math.abs(t)
-  if (abs >= 1_000_000) return `$${(t / 1_000_000).toFixed(2)}B`
-  if (abs >= 1_000) return `$${(t / 1_000).toFixed(1)}M`
-  return `$${t.toFixed(0)}K`
+function fmtUsd(
+  raw: number | string | null | undefined,
+  fundTicker?: string | null,
+): string {
+  return formatFV(raw, fundTicker)
 }
 
 function fmtPct(p: number | null | undefined): string {
-  if (p == null || !Number.isFinite(Number(p))) return "—"
-  const v = Number(p) * 100
-  const sign = v > 0 ? "+" : ""
-  return `${sign}${v.toFixed(1)}%`
+  return fmtPctLib(p, { signed: true })
 }
 
 function changeColor(pct: number | null): string {
@@ -144,7 +148,7 @@ export default async function DriftPage({
     total_positions: 0,
     count_drop_10: 0,
     count_drop_25: 0,
-    total_at_risk_thousands: 0,
+    total_at_risk_dollars: 0,
   }) as StatsRow
 
   const totalCount = rows.length > 0 ? Number(rows[0].total_count) : 0
@@ -249,13 +253,27 @@ export default async function DriftPage({
           value={Number(stats.count_drop_25)}
           accentClass="text-severity-critical"
         />
-        <StatCard
-          label="$ at risk (>10% drop)"
-          value={Number(stats.total_at_risk_thousands) / 1_000}
-          prefix="$"
-          suffix="M"
-          decimals={1}
-        />
+        {(() => {
+          const dollars = Number(stats.total_at_risk_dollars)
+          const abs = Math.abs(dollars)
+          const value =
+            abs >= 1_000_000_000
+              ? dollars / 1_000_000_000
+              : abs >= 1_000_000
+                ? dollars / 1_000_000
+                : dollars / 1_000
+          const suffix =
+            abs >= 1_000_000_000 ? "B" : abs >= 1_000_000 ? "M" : "K"
+          return (
+            <StatCard
+              label="$ at risk (>10% drop)"
+              value={Number(value.toFixed(1))}
+              prefix="$"
+              suffix={suffix}
+              decimals={1}
+            />
+          )
+        })()}
       </div>
 
       {/* Filters */}
@@ -326,11 +344,27 @@ export default async function DriftPage({
           <tbody>
             {rows.length === 0 ? (
               <tr>
-                <td
-                  colSpan={9}
-                  className="px-3 py-12 text-center text-sm text-muted"
-                >
-                  No positions match the current filters.
+                <td colSpan={9} className="px-3 py-12">
+                  <div className="mx-auto flex max-w-md flex-col items-center justify-center text-center">
+                    <svg
+                      width="64"
+                      height="64"
+                      viewBox="0 0 80 80"
+                      className="mb-3 text-muted"
+                      aria-hidden
+                    >
+                      <circle cx="40" cy="40" r="34" stroke="currentColor" strokeOpacity="0.18" strokeWidth="1" fill="none" />
+                      <circle cx="40" cy="40" r="22" stroke="currentColor" strokeOpacity="0.3" strokeWidth="1" strokeDasharray="3 3" fill="none" />
+                      <circle cx="40" cy="40" r="3" fill="currentColor" fillOpacity="0.7" />
+                    </svg>
+                    <div className="text-sm font-semibold text-default">
+                      No positions match these filters
+                    </div>
+                    <p className="mt-1 text-xs text-muted">
+                      Try lowering the FV cutoff, broadening fund selection, or
+                      including non-accrual statuses.
+                    </p>
+                  </div>
                 </td>
               </tr>
             ) : (
@@ -384,12 +418,10 @@ export default async function DriftPage({
                       </Link>
                     </td>
                     <td className="px-3 py-2.5 text-right font-mono tabular-nums text-default">
-                      {fmtUsdK(Number(r.latest_fv))}
+                      {fmtUsd(r.latest_fv, r.fund_ticker)}
                     </td>
                     <td className="px-3 py-2.5 text-right font-mono tabular-nums text-muted">
-                      {fmtUsdK(
-                        r.prior_fv == null ? null : Number(r.prior_fv),
-                      )}
+                      {fmtUsd(r.prior_fv, r.fund_ticker)}
                     </td>
                     <td
                       className={cn(
@@ -405,11 +437,7 @@ export default async function DriftPage({
                         changeColor(changePct),
                       )}
                     >
-                      {fmtUsdK(
-                        r.fv_change_thousands == null
-                          ? null
-                          : Number(r.fv_change_thousands),
-                      )}
+                      {fmtUsd(r.fv_change_thousands, r.fund_ticker)}
                     </td>
                     <td className="px-3 py-2.5 align-middle">
                       <span className={cn("text-xs font-medium", accrualClass)}>

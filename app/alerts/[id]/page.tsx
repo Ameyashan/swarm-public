@@ -18,6 +18,7 @@ import { CopySummaryButton } from "./copy-summary-button"
 import { encodeCanonicalSlug } from "@/lib/slug"
 import { SeverityRing } from "@/components/charts/SeverityRing"
 import { AnimatedNumber } from "@/components/charts/AnimatedNumber"
+import { formatFV, formatPct as fmtPctLib, formatInt } from "@/lib/format"
 import { FvHistoryChart, type FvHistoryRow } from "@/components/charts/FvHistoryChart"
 
 export const dynamic = "force-dynamic"
@@ -61,31 +62,21 @@ type Filing = {
   accession_number: string
 }
 
-// Format $thousands → human ($1.2M / $3.4B / $850K)
-function fmtUsdK(thousands: number | null): string {
-  if (thousands == null || !Number.isFinite(thousands)) return "—"
-  const millions = thousands / 1000
-  if (Math.abs(millions) >= 1000)
-    return `$${(millions / 1000).toLocaleString(undefined, {
-      maximumFractionDigits: 2,
-    })}B`
-  if (Math.abs(millions) >= 1)
-    return `$${millions.toLocaleString(undefined, {
-      maximumFractionDigits: 1,
-    })}M`
-  return `$${(thousands).toLocaleString(undefined, {
-    maximumFractionDigits: 0,
-  })}K`
+// Per-row USD formatter — takes the row's fund_ticker so we can normalize
+// from the storage scale (ARCC = millions, others = thousands).
+function fmtUsd(
+  raw: number | null | undefined,
+  fundTicker?: string | null,
+): string {
+  return formatFV(raw, fundTicker)
 }
 
 function fmtPct(p: number | null, digits = 2): string {
-  if (p == null || !Number.isFinite(p)) return "—"
-  return `${(p * 100).toFixed(digits)}%`
+  return fmtPctLib(p, { digits })
 }
 
 function fmtRawNum(n: number | null): string {
-  if (n == null || !Number.isFinite(n)) return "—"
-  return n.toLocaleString()
+  return formatInt(n)
 }
 
 function fmtDate(s: string | null | undefined): string {
@@ -554,6 +545,7 @@ export default async function AlertDetailPage({
               </thead>
               <tbody>
                 {observations.map((o) => {
+                  // FV/cost ratio is a pure ratio so storage scale cancels.
                   const fvOverCost =
                     o.fair_value != null && o.cost != null && o.cost !== 0
                       ? o.fair_value / o.cost
@@ -568,9 +560,9 @@ export default async function AlertDetailPage({
                       </Td>
                       <Td className="text-right">{fmtPct(o.pik_rate_pct)}</Td>
                       <Td>{fmtDate(o.maturity_date)}</Td>
-                      <Td className="text-right">{fmtRawNum(o.principal_amount)}</Td>
-                      <Td className="text-right">{fmtUsdK(o.cost)}</Td>
-                      <Td className="text-right">{fmtUsdK(o.fair_value)}</Td>
+                      <Td className="text-right">{fmtUsd(o.principal_amount, o.fund_ticker)}</Td>
+                      <Td className="text-right">{fmtUsd(o.cost, o.fund_ticker)}</Td>
+                      <Td className="text-right">{fmtUsd(o.fair_value, o.fund_ticker)}</Td>
                       <Td
                         className={
                           fvOverCost != null && fvOverCost < 0.85

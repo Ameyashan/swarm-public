@@ -3,9 +3,17 @@ import { format } from "date-fns"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { CASE_STUDIES, type CaseStudy } from "@/lib/case-studies"
+import { formatFV, formatPct } from "@/lib/format"
 import { FvTrajectoryChart } from "@/components/fv-trajectory-chart"
 
+import type { Metadata } from "next"
 export const dynamic = "force-static"
+
+export const metadata: Metadata = {
+  title: "Case studies",
+  description:
+    "How Swarm Public detectors caught real BDC mark drift, cross-fund divergence, and PIK creep events — step by step, with citations.",
+}
 
 function fmtDate(s: string): string {
   try {
@@ -130,7 +138,7 @@ function CaseStudyCard({ study }: { study: CaseStudy }) {
                     </span>
                     {e.severity != null ? (
                       <span className="text-xs text-muted-foreground">
-                        · severity {(e.severity * 100).toFixed(1)}%
+                        · severity {formatPct(e.severity)}
                       </span>
                     ) : null}
                   </div>
@@ -152,8 +160,8 @@ function CaseStudyCard({ study }: { study: CaseStudy }) {
               <p className="text-sm">{study.outcome.event}</p>
               {study.outcome.fv_at_event_thousands != null ? (
                 <p className="mt-2 text-xs text-muted-foreground">
-                  Position FV at this point: $
-                  {(study.outcome.fv_at_event_thousands / 1000).toFixed(2)}M
+                  Position FV at this point:{" "}
+                  {formatFV(study.outcome.fv_at_event_thousands * 1000)}
                 </p>
               ) : null}
             </div>

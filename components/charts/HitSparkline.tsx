@@ -1,6 +1,7 @@
 "use client"
 
 import { format } from "date-fns"
+import { formatFV, formatPct } from "@/lib/format"
 import { Sparkline, type SparklinePoint } from "./Sparkline"
 
 type Props = {
@@ -9,20 +10,6 @@ type Props = {
   height?: number
   width?: number | null
   className?: string
-}
-
-function fmtUsdK(thousands: number): string {
-  if (!Number.isFinite(thousands)) return "—"
-  const millions = thousands / 1000
-  if (Math.abs(millions) >= 1000)
-    return `$${(millions / 1000).toFixed(2)}B`
-  if (Math.abs(millions) >= 1) return `$${millions.toFixed(1)}M`
-  return `$${thousands.toFixed(0)}K`
-}
-
-function fmtPct(p: number): string {
-  if (!Number.isFinite(p)) return "—"
-  return `${(p * 100).toFixed(1)}%`
 }
 
 function fmtDateLabel(x: string | number): string {
@@ -50,7 +37,9 @@ export function HitSparkline({
   className,
 }: Props) {
   const isPct = detector === "pik_creep"
-  const formatValue = isPct ? fmtPct : fmtUsdK
+  const formatValue = isPct
+    ? (n: number) => formatPct(n, { digits: 1 })
+    : (n: number) => formatFV(n)
 
   let color = "#3B82F6"
   if (data.length >= 2) {

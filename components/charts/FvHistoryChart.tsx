@@ -28,13 +28,13 @@ type Props = {
   title?: string
 }
 
-function fmtUsd(thousands: number): string {
-  if (!Number.isFinite(thousands)) return "—"
-  const millions = thousands / 1000
-  if (Math.abs(millions) >= 1000)
-    return `$${(millions / 1000).toFixed(2)}B`
-  if (Math.abs(millions) >= 1) return `$${millions.toFixed(1)}M`
-  return `$${thousands.toFixed(0)}K`
+import { formatFV } from "@/lib/format"
+
+// Caller is expected to normalize values to whole dollars before passing in
+// (see /lib/format.ts:toDollars). The legacy "fv_thousands" prop name is
+// kept only for back-compat — values may now arrive at any unified scale.
+function fmtUsd(value: number): string {
+  return formatFV(value)
 }
 
 function fmtMonth(s: string): string {

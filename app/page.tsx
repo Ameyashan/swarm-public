@@ -14,7 +14,9 @@ import { RecentAlertCard } from "@/components/home/recent-alert-card"
 import { type DetectorHit } from "./alerts/alerts-helpers"
 import { fetchSparklineDataForHits } from "@/lib/sparkline-data"
 
-export const dynamic = "force-dynamic"
+// ISR: rebuild homepage at most every 5 minutes; queries are cached across
+// requests within the window, dramatically reducing Supabase load.
+export const revalidate = 300
 
 // ---------- helpers ----------
 

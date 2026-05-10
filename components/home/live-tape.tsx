@@ -2,6 +2,7 @@
 
 import { motion } from "framer-motion"
 import Link from "next/link"
+import { formatPct } from "@/lib/format"
 import { encodeCanonicalSlug } from "@/lib/slug"
 
 export type TapeItem = {
@@ -26,13 +27,13 @@ const TIER_COLOR: Record<TapeItem["tier"], string> = {
 function Pill({ item }: { item: TapeItem }) {
   const color = TIER_COLOR[item.tier]
   const slug = encodeCanonicalSlug(item.canonical ?? item.company)
-  const pct = (Math.abs(item.changePct) * 100).toFixed(1)
+  const pct = formatPct(Math.abs(item.changePct), { digits: 1 })
 
   return (
     <Link
       href={`/watch/${slug}`}
       className="group inline-flex shrink-0 items-center gap-2 px-5 text-sm font-mono"
-      title={`${item.fund} · ${item.company} · -${pct}%`}
+      title={`${item.fund} · ${item.company} · -${pct}`}
     >
       <span className="font-semibold text-default">{item.fund}</span>
       <span className="text-dim">·</span>
@@ -49,7 +50,7 @@ function Pill({ item }: { item: TapeItem }) {
         className="font-semibold tabular-nums"
         style={{ color }}
       >
-        -{pct}%
+        -{pct}
       </span>
       <span className="ml-1 text-dim">•</span>
     </Link>

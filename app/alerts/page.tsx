@@ -18,8 +18,16 @@ import { SeverityRing } from "@/components/charts/SeverityRing"
 import { HitSparkline } from "@/components/charts/HitSparkline"
 import { fetchSparklineDataForHits } from "@/lib/sparkline-data"
 import { AlertsToast } from "./alerts-toast"
+import { EmptyState } from "@/components/empty-state"
 
+import type { Metadata } from "next"
 export const dynamic = "force-dynamic"
+
+export const metadata: Metadata = {
+  title: "Alerts",
+  description:
+    "Detector hits across all monitored BDCs — mark drift, cross-fund divergence, and PIK creep, every alert cited to its filing.",
+}
 
 const PAGE_SIZE = 20
 
@@ -207,7 +215,24 @@ export default async function AlertsPage({
           Failed to load alerts: {error.message}
         </p>
       ) : hits.length === 0 ? (
-        <p className="text-sm text-muted">No alerts found.</p>
+        <EmptyState
+          title="No hits in this view yet"
+          description={
+            fundFilter || quarterFilter
+              ? "No detector hits match these filters. Try clearing filters or switching detectors above."
+              : "No detector hits found yet. New filings are scanned automatically as they post on EDGAR."
+          }
+          action={
+            fundFilter || quarterFilter ? (
+              <Link
+                href="/alerts"
+                className="inline-flex items-center rounded-md border border-default bg-card px-3 py-1.5 text-sm text-default hover:border-hover"
+              >
+                Clear filters
+              </Link>
+            ) : undefined
+          }
+        />
       ) : (
         <div className="flex flex-col gap-4">
           {hits.map((hit) => {

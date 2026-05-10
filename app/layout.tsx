@@ -24,10 +24,31 @@ const geistMono = localFont({
   weight: "100 900",
 });
 
+const SITE_URL =
+  process.env.NEXT_PUBLIC_SITE_URL ?? "https://swarm-public.vercel.app"
+
 export const metadata: Metadata = {
-  title: "Swarm Public — Agentic intelligence for public private credit",
+  metadataBase: new URL(SITE_URL),
+  title: {
+    default: "Swarm Public — Agentic intelligence for public private credit",
+    template: "%s · Swarm Public",
+  },
   description:
-    "$130B+ in BDC fair value monitored. Three predictive detectors. Every alert cited to source.",
+    "Live monitoring of every BDC filing on EDGAR. Three predictive detectors. Every alert cited.",
+  openGraph: {
+    type: "website",
+    siteName: "Swarm Public",
+    url: SITE_URL,
+    title: "Swarm Public — Agentic intelligence for public private credit",
+    description:
+      "Live monitoring of every BDC filing on EDGAR. Three predictive detectors. Every alert cited.",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Swarm Public",
+    description:
+      "Live monitoring of every BDC filing on EDGAR. Three predictive detectors. Every alert cited.",
+  },
 };
 
 export default function RootLayout({

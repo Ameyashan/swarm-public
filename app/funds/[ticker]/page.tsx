@@ -6,9 +6,24 @@ import { ObservationsTable } from "./observations-table"
 import { AnimatedNumber } from "@/components/charts/AnimatedNumber"
 import { Sparkline, type SparklinePoint } from "@/components/charts/Sparkline"
 import { format } from "date-fns"
+import { toDollars, formatFV } from "@/lib/format"
+
+import type { Metadata } from "next"
 
 // Server-render every request so we always read the latest filing.
 export const dynamic = "force-dynamic"
+
+export async function generateMetadata({
+  params,
+}: {
+  params: { ticker: string }
+}): Promise<Metadata> {
+  const ticker = params.ticker.toUpperCase()
+  return {
+    title: `${ticker} · Fund detail`,
+    description: `${ticker} BDC — latest fair-value, cost, and detector hits per position, parsed from the most recent 10-K/10-Q filing.`,
+  }
+}
 
 type Fund = {
   ticker: string
@@ -122,13 +137,16 @@ export default async function FundPage({
   // 3) All observations for that filing
   const observations = await fetchAllObservations(supabase, filing.id)
 
-  // 4) Compute summary metrics on the server
+  // 4) Compute summary metrics on the server (normalized to whole dollars)
   const totalPositions = observations.length
   const totalFairValue = observations.reduce(
-    (sum, o) => sum + (o.fair_value ?? 0),
+    (sum, o) => sum + (toDollars(o.fair_value, ticker) ?? 0),
     0
   )
-  const totalCost = observations.reduce((sum, o) => sum + (o.cost ?? 0), 0)
+  const totalCost = observations.reduce(
+    (sum, o) => sum + (toDollars(o.cost, ticker) ?? 0),
+    0
+  )
   const nonAccrualCount = observations.filter(
     (o) => o.accrual_status === "non_accrual"
   ).length
@@ -144,16 +162,30 @@ export default async function FundPage({
   const { data: fundSeriesRaw } = await supabase.rpc("fund_fv_series", {
     ticker,
   })
+  // Sparkline rows from RPC come back at storage scale; normalize per-ticker.
   const fundSeries: SparklinePoint[] = ((fundSeriesRaw ?? []) as FundFvRow[])
-    .map((r) => ({ x: r.period_end, y: Number(r.fv_thousands) }))
+    .map((r) => ({
+      x: r.period_end,
+      y: toDollars(Number(r.fv_thousands), ticker) ?? 0,
+    }))
     .sort((a, b) => String(a.x).localeCompare(String(b.x)))
 
-  // Headline values for AnimatedNumber
-  const fvMillions = totalFairValue / 1000
-  const fvUsesB = Math.abs(fvMillions) >= 1000
-  const fvHeadlineValue = fvUsesB ? fvMillions / 1000 : fvMillions
-  const fvHeadlineSuffix = fvUsesB ? "B" : "M"
-  const fvHeadlineDecimals = fvUsesB ? 2 : 1
+  // Headline values for AnimatedNumber: split FV/cost into B-or-M scale on
+  // whole-dollar inputs so the count-up animation has a sensible target.
+  function headline(dollars: number): {
+    value: number
+    suffix: "B" | "M" | "K"
+    decimals: number
+  } {
+    const abs = Math.abs(dollars)
+    if (abs >= 1_000_000_000)
+      return { value: dollars / 1_000_000_000, suffix: "B", decimals: 1 }
+    if (abs >= 1_000_000)
+      return { value: dollars / 1_000_000, suffix: "M", decimals: 1 }
+    return { value: dollars / 1_000, suffix: "K", decimals: 1 }
+  }
+  const fvHead = headline(totalFairValue)
+  const costHead = headline(totalCost)
 
   return (
     <main className="mx-auto flex min-h-screen max-w-7xl flex-col px-6 py-12">
@@ -188,11 +220,7 @@ export default async function FundPage({
               width={280}
               height={56}
               color="#3B82F6"
-              formatValue={(v) =>
-                Math.abs(v / 1000) >= 1000
-                  ? `$${(v / 1_000_000).toFixed(2)}B`
-                  : `$${(v / 1000).toFixed(1)}M`
-              }
+              formatValue={(v) => formatFV(v)}
               formatLabel={(x) => {
                 try {
                   return format(new Date(String(x)), "MMM yyyy")
@@ -217,31 +245,25 @@ export default async function FundPage({
             numberClassName="inline-flex items-baseline gap-0.5 text-2xl font-bold tabular-nums text-default"
           />
         </SummaryCard>
-        <SummaryCard label="Total fair value" hint="$ in thousands">
+        <SummaryCard label="Total fair value">
           <AnimatedNumber
-            value={fvHeadlineValue}
+            value={Number(fvHead.value.toFixed(fvHead.decimals))}
             prefix="$"
-            suffix={fvHeadlineSuffix}
-            decimals={fvHeadlineDecimals}
+            suffix={fvHead.suffix}
+            decimals={fvHead.decimals}
             duration={1.5}
             numberClassName="inline-flex items-baseline gap-0.5 text-2xl font-bold tabular-nums text-default"
           />
         </SummaryCard>
-        <SummaryCard label="Total cost" hint="$ in thousands">
-          {(() => {
-            const costM = totalCost / 1000
-            const usesB = Math.abs(costM) >= 1000
-            return (
-              <AnimatedNumber
-                value={usesB ? costM / 1000 : costM}
-                prefix="$"
-                suffix={usesB ? "B" : "M"}
-                decimals={usesB ? 2 : 1}
-                duration={1.5}
-                numberClassName="inline-flex items-baseline gap-0.5 text-2xl font-bold tabular-nums text-default"
-              />
-            )
-          })()}
+        <SummaryCard label="Total cost">
+          <AnimatedNumber
+            value={Number(costHead.value.toFixed(costHead.decimals))}
+            prefix="$"
+            suffix={costHead.suffix}
+            decimals={costHead.decimals}
+            duration={1.5}
+            numberClassName="inline-flex items-baseline gap-0.5 text-2xl font-bold tabular-nums text-default"
+          />
         </SummaryCard>
         <SummaryCard label="Non-accrual">
           <AnimatedNumber
@@ -267,8 +289,9 @@ export default async function FundPage({
       <ObservationsTable observations={observations} />
 
       <footer className="mt-12 border-t pt-6 text-sm text-muted-foreground">
-        Source: SEC EDGAR. Values reported as filed; SoI tables are denominated
-        in thousands.
+        Source: SEC EDGAR. Values normalized to whole dollars from the
+        as-filed scale (ARCC reports in $millions; all other BDCs in
+        $thousands).
       </footer>
     </main>
   )

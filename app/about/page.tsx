@@ -1,6 +1,13 @@
 import Link from "next/link"
+import type { Metadata } from "next"
 
 export const dynamic = "force-static"
+
+export const metadata: Metadata = {
+  title: "How it works",
+  description:
+    "Swarm Public is an agentic intelligence layer for public private credit. Here's how the detectors work, what they catch, and why every alert is cited.",
+}
 
 export default function AboutPage() {
   return (

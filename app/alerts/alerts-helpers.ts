@@ -1,4 +1,5 @@
 // Helpers for rendering detector hits on the /alerts page.
+import { formatFV, formatPct } from "@/lib/format"
 
 export type DetectorName =
   | "mark_drift_down"
@@ -62,35 +63,21 @@ export function severityBadgeClass(tier: "severe" | "moderate" | "mild"): string
   }
 }
 
-// Format USD amounts. FV values in detector hits are stored in $thousands.
-function fmtUsdFromThousands(thousands: number | null | undefined): string {
-  if (thousands == null || Number.isNaN(thousands)) return "—"
-  const millions = thousands / 1000
-  if (Math.abs(millions) >= 1000) {
-    return `$${(millions / 1000).toFixed(2)}B`
-  }
-  return `$${millions.toFixed(1)}M`
-}
-
-function pct(n: number | null | undefined, digits = 1): string {
-  if (n == null || Number.isNaN(n)) return "—"
-  return `${(n * 100).toFixed(digits)}%`
-}
-
 export function summarize(hit: DetectorHit): string {
   const d = hit.hit_data ?? {}
+  const ticker = hit.fund_ticker ?? undefined
   if (hit.detector_name === "mark_drift_down") {
     const change = Math.abs(Number(d.fv_change_pct ?? 0))
-    const prior = fmtUsdFromThousands(Number(d.fv_prior))
-    const curr = fmtUsdFromThousands(Number(d.fv_current))
+    const prior = formatFV(Number(d.fv_prior), ticker)
+    const curr = formatFV(Number(d.fv_current), ticker)
     const accrual = d.accrual_status ? ` while still on ${d.accrual_status}` : ""
-    return `Fair value down ${(change * 100).toFixed(1)}% (${prior} → ${curr})${accrual}`
+    return `Fair value down ${formatPct(change)} (${prior} → ${curr})${accrual}`
   }
   if (hit.detector_name === "pik_creep") {
     const delta = Number(d.delta_pp ?? 0)
     const prior = Number(d.pik_share_prior ?? 0)
     const curr = Number(d.pik_share_current ?? 0)
-    return `PIK share rose ${(delta * 100).toFixed(2)}pp (${(prior * 100).toFixed(2)}% → ${(curr * 100).toFixed(2)}%)`
+    return `PIK share rose ${(delta * 100).toFixed(2)}pp (${formatPct(prior, { digits: 2 })} → ${formatPct(curr, { digits: 2 })})`
   }
   if (hit.detector_name === "cross_fund_divergence") {
     const spread = Number(d.spread_pp ?? 0)
@@ -134,7 +121,7 @@ export function formatSeverity(detector: string, score: number | null): string {
   if (score == null) return "—"
   const s = Math.abs(score)
   if (detector === "cross_fund_divergence" || detector === "mark_drift_down") {
-    return `${(s * 100).toFixed(1)}%`
+    return formatPct(s)
   }
   if (detector === "pik_creep") {
     return `${(s * 100).toFixed(2)}pp`

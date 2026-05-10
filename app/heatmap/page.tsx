@@ -13,7 +13,14 @@ import {
   type DetectorHit,
 } from "@/app/alerts/alerts-helpers"
 
+import type { Metadata } from "next"
 export const dynamic = "force-dynamic"
+
+export const metadata: Metadata = {
+  title: "Heatmap",
+  description:
+    "Severity-weighted detector hits per fund per quarter — spot the funds and quarters with the most distressed positions.",
+}
 
 const QUARTERS = 12
 
@@ -54,7 +61,7 @@ type HeatmapRpcRow = {
 type FundFvRow = {
   fund_ticker: string
   latest_period_end: string
-  total_fv_thousands: number | string
+  total_fv_dollars: number | string
 }
 
 export default async function HeatmapPage() {
@@ -112,10 +119,10 @@ export default async function HeatmapPage() {
     cellByKey.set(`${r.fund_ticker}|${r.quarter_start}`, r)
   }
 
-  // Total FV per fund for sort ordering and label display.
+  // Total FV per fund (whole dollars) for sort ordering and label display.
   const fvByFund = new Map<string, number>()
   for (const r of fvRows) {
-    fvByFund.set(r.fund_ticker, Number(r.total_fv_thousands))
+    fvByFund.set(r.fund_ticker, Number(r.total_fv_dollars))
   }
 
   // Universe of funds = funds with any hit OR any FV (so empty rows still appear if relevant).
@@ -191,10 +198,10 @@ export default async function HeatmapPage() {
         topHits,
       }
     })
-    const totalFvThousands = fvByFund.get(fund) ?? 0
+    const totalFvDollars = fvByFund.get(fund) ?? 0
     return {
       fund,
-      totalFvB: totalFvThousands / 1_000_000, // thousands → billions
+      totalFvB: totalFvDollars / 1_000_000_000, // dollars → billions
       cells,
     }
   })

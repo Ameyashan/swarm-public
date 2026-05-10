@@ -32,6 +32,7 @@ import {
   type DetectorHit,
 } from "@/app/alerts/alerts-helpers"
 import { fmtUsdFromThousands, fmtPct, fmtPeriodShort } from "./format"
+import { formatFV } from "@/lib/format"
 
 export type FundSummary = {
   ticker: string
@@ -314,7 +315,7 @@ function MiniChart({
                 fontSize: 11,
               }}
               labelStyle={{ color: "#9CA3AF" }}
-              formatter={(v: any) => [`$${Number(v).toFixed(2)}M`, "FV"]}
+              formatter={(v: any) => [formatFV(Number(v)), "FV"]}
             />
             <Area
               type="monotone"

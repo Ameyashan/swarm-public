@@ -1,3 +1,4 @@
+import { formatFV, formatQuarter } from "@/lib/format"
 import type { FvPoint } from "@/lib/case-studies"
 
 type Props = {
@@ -57,21 +58,9 @@ export function FvTrajectoryChart({ data, width = 640, height = 220 }: Props) {
   // X-axis labels: show every 1 if <=8 points, else thin out.
   const labelEvery = data.length <= 8 ? 1 : Math.ceil(data.length / 8)
 
-  function fmtUsd(thousands: number): string {
-    const m = thousands / 1000
-    if (Math.abs(m) >= 1000) return `$${(m / 1000).toFixed(1)}B`
-    if (Math.abs(m) >= 10) return `$${m.toFixed(0)}M`
-    return `$${m.toFixed(1)}M`
-  }
-  function fmtPeriod(s: string): string {
-    // 2024-09-30 -> Q3 '24
-    const m = /^(\d{4})-(\d{2})/.exec(s)
-    if (!m) return s
-    const yr = m[1].slice(2)
-    const mo = parseInt(m[2], 10)
-    const q = mo <= 3 ? "Q1" : mo <= 6 ? "Q2" : mo <= 9 ? "Q3" : "Q4"
-    return `${q} '${yr}`
-  }
+  // Case-study data is stored in $thousands; convert to dollars for formatFV.
+  const fmtUsd = (thousands: number) => formatFV(thousands * 1000)
+  const fmtPeriod = (s: string) => formatQuarter(s)
 
   return (
     <svg

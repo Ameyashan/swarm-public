@@ -21,6 +21,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { cn } from "@/lib/utils"
+import { formatFV } from "@/lib/format"
 import type { Observation } from "./page"
 
 type SortKey =
@@ -217,10 +218,10 @@ export function ObservationsTable({
                     {o.interest_rate_text ?? "—"}
                   </TableCell>
                   <TableCell className="text-right font-mono">
-                    {formatNumber(o.fair_value)}
+                    {formatFV(o.fair_value, o.fund_ticker)}
                   </TableCell>
                   <TableCell className="text-right font-mono">
-                    {formatNumber(o.cost)}
+                    {formatFV(o.cost, o.fund_ticker)}
                   </TableCell>
                   <TableCell>
                     <StatusBadge
@@ -270,8 +271,4 @@ function StatusBadge({
   )
 }
 
-function formatNumber(n: number | null): string {
-  if (n === null || n === undefined) return "—"
-  // values stored in $thousands; show with commas, no decimals
-  return n.toLocaleString(undefined, { maximumFractionDigits: 0 })
-}
+

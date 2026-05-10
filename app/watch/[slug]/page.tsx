@@ -5,10 +5,24 @@ import { createClient } from "@/lib/supabase/server"
 import { Badge } from "@/components/ui/badge"
 import { AnimatedNumber } from "@/components/charts/AnimatedNumber"
 import { decodeCanonicalSlug } from "@/lib/slug"
+import { toDollars } from "@/lib/format"
 import type { DetectorHit } from "@/app/alerts/alerts-helpers"
 import { WatchTabs } from "./watch-tabs"
+import type { Metadata } from "next"
 
 export const dynamic = "force-dynamic"
+
+export async function generateMetadata({
+  params,
+}: {
+  params: { slug: string }
+}): Promise<Metadata> {
+  const name = decodeCanonicalSlug(params.slug)
+  return {
+    title: `${name} · Watch`,
+    description: `Cross-fund view of ${name} — fair value over time, fund-by-fund marks, detector hits, and intelligence.`,
+  }
+}
 
 type Observation = {
   id: string
@@ -125,11 +139,12 @@ export default async function WatchPage({
   // ── Aggregate per-period FV per fund (stacked area input) ───────────────
   // Sum duplicate (fund, period) rows together. Some borrowers have multiple
   // tranches in the same fund's filing.
-  const fundPeriodFv = new Map<string, Map<string, number>>() // fund → period → fv (thousands)
+  // fund → period → fv (whole dollars; normalized via per-fund scale)
+  const fundPeriodFv = new Map<string, Map<string, number>>()
   for (const o of observations) {
     if (!o.fund_ticker || !o.period_end || o.fair_value == null) continue
-    const fv = Number(o.fair_value)
-    if (!Number.isFinite(fv)) continue
+    const fv = toDollars(o.fair_value, o.fund_ticker)
+    if (fv == null) continue
     let inner = fundPeriodFv.get(o.fund_ticker)
     if (!inner) {
       inner = new Map()
@@ -200,14 +215,14 @@ export default async function WatchPage({
     if (o.period_end < s.firstPeriod) s.firstPeriod = o.period_end
     if (o.period_end >= s.latestPeriod) {
       s.latestPeriod = o.period_end
-      s.latestFv = o.fair_value != null ? Number(o.fair_value) : null
-      s.latestCost = o.cost != null ? Number(o.cost) : null
+      s.latestFv = toDollars(o.fair_value, o.fund_ticker)
+      s.latestCost = toDollars(o.cost, o.fund_ticker)
       s.latestAccrual = o.accrual_status
     }
     s.series.push({
       period: o.period_end,
-      fv: o.fair_value != null ? Number(o.fair_value) : null,
-      cost: o.cost != null ? Number(o.cost) : null,
+      fv: toDollars(o.fair_value, o.fund_ticker),
+      cost: toDollars(o.cost, o.fund_ticker),
     })
   }
   Array.from(fundMap.values()).forEach((s) => {
@@ -271,8 +286,10 @@ export default async function WatchPage({
   if (latestPeriod) {
     for (const o of observations) {
       if (o.period_end !== latestPeriod) continue
-      if (o.fair_value != null) latestFvSum += Number(o.fair_value)
-      if (o.cost != null) latestCostSum += Number(o.cost)
+      const fv = toDollars(o.fair_value, o.fund_ticker)
+      const cost = toDollars(o.cost, o.fund_ticker)
+      if (fv != null) latestFvSum += fv
+      if (cost != null) latestCostSum += cost
     }
   }
   const fvOverCostPct = latestCostSum > 0 ? latestFvSum / latestCostSum : null

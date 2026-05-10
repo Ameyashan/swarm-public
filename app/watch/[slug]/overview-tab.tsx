@@ -22,6 +22,7 @@ import { Sparkline } from "@/components/charts/Sparkline"
 import type { DetectorHit } from "@/app/alerts/alerts-helpers"
 import { DETECTOR_LABELS, summarize } from "@/app/alerts/alerts-helpers"
 import { fmtUsdFromThousands, fmtPct, fmtPeriodShort } from "./format"
+import { formatFV } from "@/lib/format"
 import type { PeriodHits, StackedRow } from "./watch-tabs"
 
 // Distinct colors per fund — colorblind-aware ordering. Cycles if >8.
@@ -150,7 +151,7 @@ export function OverviewTab({
                   tick={{ fill: "#9CA3AF", fontSize: 11 }}
                   axisLine={{ stroke: "#1F2937" }}
                   tickLine={{ stroke: "#1F2937" }}
-                  tickFormatter={(v) => `$${Number(v).toFixed(0)}M`}
+                  tickFormatter={(v) => formatFV(Number(v))}
                   width={60}
                 />
                 <Tooltip content={<StackedTooltip periodHits={periodHits} />} />
@@ -249,7 +250,7 @@ function StackedTooltip(props: any) {
         {label}
       </div>
       <div className="mt-1 font-semibold tabular-nums">
-        Total ${totalM.toFixed(2)}M
+        Total {formatFV(totalM)}
       </div>
       <div className="mt-2 space-y-0.5">
         {payload
@@ -269,7 +270,7 @@ function StackedTooltip(props: any) {
                 <span className="font-mono">{p.dataKey}</span>
               </span>
               <span className="tabular-nums">
-                ${Number(p.value).toFixed(2)}M
+                {formatFV(Number(p.value))}
               </span>
             </div>
           ))}
