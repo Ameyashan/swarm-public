@@ -13,36 +13,46 @@ export function BriefingHero({
 }) {
   const stamp = briefingTimestampET(now)
   return (
-    <header className="mb-8 flex flex-col gap-4 border-b border-default pb-7 sm:flex-row sm:items-end sm:justify-between">
+    <header
+      className="mb-7 flex flex-col gap-4 border-b pb-[22px] sm:flex-row sm:items-end sm:justify-between"
+      style={{ borderColor: "var(--line)" }}
+    >
       <div>
-        <div className="mb-2 font-mono text-[11px] uppercase tracking-wider text-dim">
+        <div className="mb-[6px] font-mono text-[11px] text-text-faint">
           {stamp}
         </div>
-        <h1 className="font-serif text-4xl font-normal leading-[1.1] tracking-tight text-default sm:text-[42px]">
-          Good morning, <span className="text-gs-gold">Ameya</span>.
+        <h1 className="font-serif text-[34px] font-normal leading-[1.15] tracking-[-0.8px] text-text">
+          Good morning, <span className="text-gs">Ameya</span>.
         </h1>
-        <p className="mt-3 max-w-2xl font-serif text-[17px] leading-relaxed text-muted">
-          Here's what changed in GSCR and GSBD overnight, what to bring to the 9 AM committee,
-          and how Goldman's marks compare to the BDC universe this week.
+        <p className="mt-2 max-w-[720px] font-serif text-[17px] leading-[1.6] text-text-dim">
+          Here&apos;s what changed in GSCR and GSBD overnight, what to bring to
+          the 9 AM committee, and how Goldman&apos;s marks compare to the BDC
+          universe this week.
         </p>
       </div>
-      <ul className="flex flex-wrap items-center gap-4 font-mono text-[11px] text-muted">
+      <ul className="flex flex-wrap items-center gap-[14px] font-mono text-[11px] text-text-dim">
         <li className="flex items-center gap-1.5">
-          <span className="h-1.5 w-1.5 rounded-full bg-brick-red" aria-hidden />
+          <span className="text-red" aria-hidden>
+            ●
+          </span>
           <span>
-            <span className="font-medium text-default">{critical}</span> critical
+            <span className="font-medium text-text">{critical}</span> critical
           </span>
         </li>
         <li className="flex items-center gap-1.5">
-          <span className="h-1.5 w-1.5 rounded-full bg-mustard" aria-hidden />
+          <span className="text-amber" aria-hidden>
+            ●
+          </span>
           <span>
-            <span className="font-medium text-default">{watch}</span> watch
+            <span className="font-medium text-text">{watch}</span> watch
           </span>
         </li>
         <li className="flex items-center gap-1.5">
-          <span className="h-1.5 w-1.5 rounded-full bg-sage" aria-hidden />
+          <span className="text-green" aria-hidden>
+            ●
+          </span>
           <span>
-            <span className="font-medium text-default">{info}</span> info
+            <span className="font-medium text-text">{info}</span> info
           </span>
         </li>
       </ul>

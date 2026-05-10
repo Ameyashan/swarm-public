@@ -8,18 +8,23 @@ export function EditorialHeadlineBlock({
   return (
     <section
       aria-label="Today's headline"
-      className="relative overflow-hidden rounded-r-xl border border-terracotta/40 border-l-[3px] border-l-terracotta bg-gradient-to-b from-terracotta-soft via-transparent to-transparent p-6 sm:p-7"
+      className="rounded-r-[10px] border border-l-[3px] px-[26px] py-[22px]"
+      style={{
+        borderColor: "var(--accent)",
+        background:
+          "linear-gradient(180deg, rgba(189, 93, 60, 0.06), transparent 70%)",
+      }}
     >
-      <div className="mb-3 font-mono text-[10px] uppercase tracking-[0.18em] text-terracotta">
-        Today's headline · auto-generated
+      <div className="mb-3 font-mono text-[10px] uppercase tracking-[0.18em] text-accent">
+        Today&apos;s headline · auto-generated
       </div>
-      <p className="font-serif text-2xl leading-[1.4] tracking-tight text-default sm:text-[26px]">
+      <p className="font-serif text-[24px] font-normal leading-[1.4] tracking-[-0.4px] text-text">
         {headline.spans.map((span, i) => {
           if (span.kind === "ticker") {
             return (
               <span
                 key={i}
-                className="font-mono not-italic font-medium text-gs-gold"
+                className="font-mono font-medium not-italic text-gs"
               >
                 {span.text}
               </span>
@@ -28,12 +33,12 @@ export function EditorialHeadlineBlock({
           if (span.kind === "company") {
             const color =
               span.severity === "critical"
-                ? "text-brick-red"
+                ? "text-red"
                 : span.severity === "watch"
-                ? "text-mustard"
-                : "text-default"
+                ? "text-amber"
+                : "text-text"
             return (
-              <span key={i} className={`not-italic font-medium ${color}`}>
+              <span key={i} className={`font-medium not-italic ${color}`}>
                 {span.text}
               </span>
             )
@@ -41,7 +46,9 @@ export function EditorialHeadlineBlock({
           return <span key={i}>{span.text}</span>
         })}
       </p>
-      <div className="mt-3 font-mono text-[11px] text-dim">{headline.meta}</div>
+      <div className="mt-3 font-mono text-[11px] text-text-faint">
+        {headline.meta}
+      </div>
     </section>
   )
 }

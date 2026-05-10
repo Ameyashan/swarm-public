@@ -125,8 +125,10 @@ export default async function BriefingPage() {
     info: buckets.info.length,
   }
 
+  const topSev = sevScore100(merged[0]?.severity_score ?? 0)
+
   return (
-    <main className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-10 sm:px-6 sm:py-12">
+    <main className="flex flex-col gap-6">
       <BriefingHero
         critical={heroCounts.critical}
         watch={heroCounts.watch}
@@ -141,21 +143,45 @@ export default async function BriefingPage() {
 
       <section className="grid grid-cols-1 gap-4 md:grid-cols-[2fr_1fr]">
         <CommitteeQuestions questions={committee} />
-        <PeerRankPanel
-          stats={peerStats}
-          markVariance={markVar}
-        />
+        <PeerRankPanel stats={peerStats} markVariance={markVar} />
       </section>
 
-      {/* Surface a hint that the rest of the workflow surfaces are coming. */}
-      <section className="mt-6 flex flex-wrap items-center gap-3 border-t border-default pt-6 font-mono text-[11px] text-dim">
-        <span>Next:</span>
-        <span className="rounded-sm border border-default bg-card px-2 py-0.5">Position Book</span>
-        <span className="rounded-sm border border-default bg-card px-2 py-0.5">Borrower X-Ray</span>
-        <span className="rounded-sm border border-default bg-card px-2 py-0.5">Peer Telemetry</span>
-        <span className="rounded-sm border border-default bg-card px-2 py-0.5">Patterns</span>
-        <span className="rounded-sm border border-default bg-card px-2 py-0.5">Memo Composer</span>
-        <span className="ml-auto">Briefing surfaces · live · {sevScore100(merged[0]?.severity_score ?? 0)} top sev</span>
+      <section
+        className="mt-2 flex flex-wrap items-center gap-3 border-t pt-5 font-mono text-[11px] text-text-faint"
+        style={{ borderColor: "var(--line)" }}
+      >
+        <span>This briefing is live. Future surfaces ship in later commits:</span>
+        <span
+          className="rounded-sm border px-2 py-0.5"
+          style={{ background: "var(--bg-1)", borderColor: "var(--line)" }}
+        >
+          Position book
+        </span>
+        <span
+          className="rounded-sm border px-2 py-0.5"
+          style={{ background: "var(--bg-1)", borderColor: "var(--line)" }}
+        >
+          Borrower x-ray
+        </span>
+        <span
+          className="rounded-sm border px-2 py-0.5"
+          style={{ background: "var(--bg-1)", borderColor: "var(--line)" }}
+        >
+          Peer telemetry
+        </span>
+        <span
+          className="rounded-sm border px-2 py-0.5"
+          style={{ background: "var(--bg-1)", borderColor: "var(--line)" }}
+        >
+          Patterns
+        </span>
+        <span
+          className="rounded-sm border px-2 py-0.5"
+          style={{ background: "var(--bg-1)", borderColor: "var(--line)" }}
+        >
+          Memo composer
+        </span>
+        <span className="ml-auto">live · top sev {topSev}</span>
       </section>
     </main>
   )

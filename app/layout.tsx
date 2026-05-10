@@ -1,36 +1,32 @@
-import type { Metadata } from "next";
-import localFont from "next/font/local";
-import { Inter, Source_Serif_4 } from "next/font/google";
-import "./globals.css";
-import { NavBar } from "@/components/nav-bar";
-import { SiteFooter } from "@/components/site-footer";
-import { CommandPalette } from "@/components/command-palette";
-import { Toaster } from "sonner";
+import type { Metadata } from "next"
+import { Inter, JetBrains_Mono, Source_Serif_4 } from "next/font/google"
+import "./globals.css"
+import { NavBar } from "@/components/nav-bar"
 
 const inter = Inter({
   subsets: ["latin"],
   variable: "--font-inter",
   display: "swap",
-});
+})
 
+// NOTE: spec calls for "Source Serif Pro". next/font/google ships the
+// successor family Source Serif 4 (same Adobe family, renamed in 2022); we
+// load that and keep "Source Serif Pro" in the CSS fallback stack so machines
+// with the original family installed render identically.
 const serif = Source_Serif_4({
   subsets: ["latin"],
   variable: "--font-serif",
   display: "swap",
   weight: ["400", "500", "600"],
   style: ["normal", "italic"],
-});
+})
 
-const geistSans = localFont({
-  src: "./fonts/GeistVF.woff",
-  variable: "--font-geist-sans",
-  weight: "100 900",
-});
-const geistMono = localFont({
-  src: "./fonts/GeistMonoVF.woff",
-  variable: "--font-geist-mono",
-  weight: "100 900",
-});
+const jetbrains = JetBrains_Mono({
+  subsets: ["latin"],
+  variable: "--font-mono",
+  display: "swap",
+  weight: ["400", "500", "600"],
+})
 
 const SITE_URL =
   process.env.NEXT_PUBLIC_SITE_URL ?? "https://swarm-public.vercel.app"
@@ -38,55 +34,29 @@ const SITE_URL =
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: {
-    default: "Swarm Public — Agentic intelligence for public private credit",
-    template: "%s · Swarm Public",
+    default: "Swarm — credit intelligence for Goldman PMs",
+    template: "%s · Swarm",
   },
   description:
-    "Live monitoring of every BDC filing on EDGAR. Three predictive detectors. Every alert cited.",
-  openGraph: {
-    type: "website",
-    siteName: "Swarm Public",
-    url: SITE_URL,
-    title: "Swarm Public — Agentic intelligence for public private credit",
-    description:
-      "Live monitoring of every BDC filing on EDGAR. Three predictive detectors. Every alert cited.",
-  },
-  twitter: {
-    card: "summary_large_image",
-    title: "Swarm Public",
-    description:
-      "Live monitoring of every BDC filing on EDGAR. Three predictive detectors. Every alert cited.",
-  },
-};
+    "Morning briefing, position book, borrower x-ray, peer telemetry, patterns, and memo composer for the Goldman PM managing GSCR + GSBD.",
+}
 
 export default function RootLayout({
   children,
 }: Readonly<{
-  children: React.ReactNode;
+  children: React.ReactNode
 }>) {
   return (
-    <html lang="en" className={`${inter.variable} ${serif.variable} dark`}>
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} font-sans antialiased flex min-h-screen flex-col bg-surface text-default`}
-      >
+    <html
+      lang="en"
+      className={`${inter.variable} ${serif.variable} ${jetbrains.variable}`}
+    >
+      <body className="min-h-screen bg-bg text-text antialiased">
         <NavBar />
-        <div className="flex-1">{children}</div>
-        <SiteFooter />
-        <CommandPalette />
-        <Toaster
-          theme="dark"
-          position="bottom-right"
-          closeButton
-          richColors={false}
-          toastOptions={{
-            style: {
-              background: "#0F1623",
-              border: "1px solid #1F2937",
-              color: "#E5E7EB",
-            },
-          }}
-        />
+        <div className="mx-auto w-full max-w-[1280px] px-6 py-6">
+          {children}
+        </div>
       </body>
     </html>
-  );
+  )
 }
