@@ -19,6 +19,22 @@ const tokens = {
   statusAccrual: "#10B981",
   statusNonAccrual: "#EF4444",
   statusPik: "#F59E0B",
+  // Editorial briefing palette (semantic — keep strict per spec).
+  // terracotta = editorial accent / headline block / primary editorial affordance
+  // gsGold     = Goldman identity / GSCR + GSBD markers / ★ glyphs
+  // brickRed   = critical severity only (sev >= 70)
+  // mustard    = watch signal only (sev 40-70 / elevated PIK)
+  // sage       = healthy / positive credit signal only
+  terracotta: "#D97757",
+  terracottaSoft: "rgba(217, 119, 87, 0.10)",
+  gsGold: "#D4A857",
+  gsGoldSoft: "rgba(212, 168, 87, 0.10)",
+  brickRed: "#E5564B",
+  brickRedSoft: "rgba(229, 86, 75, 0.10)",
+  mustard: "#E0B341",
+  mustardSoft: "rgba(224, 179, 65, 0.10)",
+  sage: "#8FBF8E",
+  sageSoft: "rgba(143, 191, 142, 0.10)",
 };
 
 const config: Config = {
@@ -32,6 +48,13 @@ const config: Config = {
     extend: {
       fontFamily: {
         sans: ["var(--font-inter)", "Inter", "system-ui", "sans-serif"],
+        serif: [
+          "var(--font-serif)",
+          "Source Serif 4",
+          "Source Serif Pro",
+          "Georgia",
+          "serif",
+        ],
       },
 
       // Semantic background-color utilities: bg-surface, bg-elevated, bg-card
@@ -48,6 +71,17 @@ const config: Config = {
         "status-accrual": tokens.statusAccrual,
         "status-non-accrual": tokens.statusNonAccrual,
         "status-pik": tokens.statusPik,
+        // Editorial briefing palette
+        terracotta: tokens.terracotta,
+        "terracotta-soft": tokens.terracottaSoft,
+        "gs-gold": tokens.gsGold,
+        "gs-gold-soft": tokens.gsGoldSoft,
+        "brick-red": tokens.brickRed,
+        "brick-red-soft": tokens.brickRedSoft,
+        mustard: tokens.mustard,
+        "mustard-soft": tokens.mustardSoft,
+        sage: tokens.sage,
+        "sage-soft": tokens.sageSoft,
       },
 
       // Semantic border-color utilities: border-default, border-hover
@@ -59,6 +93,11 @@ const config: Config = {
         "severity-high": tokens.severityHigh,
         "severity-medium": tokens.severityMedium,
         "severity-low": tokens.severityLow,
+        terracotta: tokens.terracotta,
+        "gs-gold": tokens.gsGold,
+        "brick-red": tokens.brickRed,
+        mustard: tokens.mustard,
+        sage: tokens.sage,
       },
 
       // Semantic text-color utilities: text-default, text-muted, text-dim
@@ -74,6 +113,11 @@ const config: Config = {
         "status-accrual": tokens.statusAccrual,
         "status-non-accrual": tokens.statusNonAccrual,
         "status-pik": tokens.statusPik,
+        terracotta: tokens.terracotta,
+        "gs-gold": tokens.gsGold,
+        "brick-red": tokens.brickRed,
+        mustard: tokens.mustard,
+        sage: tokens.sage,
       },
 
       // General colors (covers ring-, fill-, stroke-, etc., plus shadcn vars).
@@ -98,6 +142,16 @@ const config: Config = {
           "non-accrual": tokens.statusNonAccrual,
           pik: tokens.statusPik,
         },
+        terracotta: tokens.terracotta,
+        "terracotta-soft": tokens.terracottaSoft,
+        "gs-gold": tokens.gsGold,
+        "gs-gold-soft": tokens.gsGoldSoft,
+        "brick-red": tokens.brickRed,
+        "brick-red-soft": tokens.brickRedSoft,
+        mustard: tokens.mustard,
+        "mustard-soft": tokens.mustardSoft,
+        sage: tokens.sage,
+        "sage-soft": tokens.sageSoft,
 
         // shadcn/ui CSS-variable tokens (kept for existing components).
         border: "hsl(var(--border))",
