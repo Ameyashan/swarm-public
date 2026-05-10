@@ -2,14 +2,11 @@ import Link from "next/link"
 import { format } from "date-fns"
 import { createClient } from "@/lib/supabase/server"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
 import {
   DETECTOR_TABS,
   DETECTOR_LABELS,
   type DetectorHit,
-  severityTier,
-  severityBadgeClass,
   summarize,
   sourceFilingUrl,
   fundTickerLabel,
@@ -17,6 +14,9 @@ import {
   formatSeverity,
 } from "./alerts-helpers"
 import { encodeCanonicalSlug } from "@/lib/slug"
+import { SeverityRing } from "@/components/charts/SeverityRing"
+import { HitSparkline } from "@/components/charts/HitSparkline"
+import { fetchSparklineDataForHits } from "@/lib/sparkline-data"
 
 export const dynamic = "force-dynamic"
 
@@ -58,6 +58,12 @@ export default async function AlertsPage({
   const totalCount = count ?? 0
   const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE))
 
+  const hits = data ?? []
+  const { byHitId: sparkByHitId } =
+    hits.length > 0
+      ? await fetchSparklineDataForHits(hits)
+      : { byHitId: {} as Record<string, { x: string; y: number }[]> }
+
   function buildHref(detector: string, page: number): string {
     const params = new URLSearchParams()
     if (detector !== "all") params.set("detector", detector)
@@ -72,18 +78,20 @@ export default async function AlertsPage({
         <div className="mb-2 text-sm">
           <Link
             href="/"
-            className="text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+            className="text-muted underline-offset-4 hover:text-default hover:underline"
           >
             ← Home
           </Link>
         </div>
-        <h1 className="text-4xl font-bold tracking-tight sm:text-5xl">Alerts</h1>
-        <p className="mt-2 text-muted-foreground">
+        <h1 className="text-4xl font-bold tracking-tight text-default sm:text-5xl">
+          Alerts
+        </h1>
+        <p className="mt-2 text-muted">
           Detector hits across all BDC filings, sorted by most recent.
         </p>
       </header>
 
-      <nav className="mb-8 flex flex-wrap gap-1 border-b">
+      <nav className="mb-8 flex flex-wrap gap-1 border-b border-default">
         {DETECTOR_TABS.map((tab) => {
           const active = tab.key === activeDetector
           return (
@@ -93,9 +101,14 @@ export default async function AlertsPage({
               className={cn(
                 "border-b-2 px-4 py-2 text-sm font-medium transition-colors",
                 active
-                  ? "border-foreground text-foreground"
-                  : "border-transparent text-muted-foreground hover:text-foreground",
+                  ? "border-default text-default"
+                  : "border-transparent text-muted hover:text-default",
               )}
+              style={
+                active
+                  ? { borderColor: "#3B82F6", color: "#F3F4F6" }
+                  : undefined
+              }
             >
               {tab.label}
             </Link>
@@ -104,58 +117,83 @@ export default async function AlertsPage({
       </nav>
 
       {error ? (
-        <p className="text-sm text-destructive">
+        <p className="text-sm text-severity-critical">
           Failed to load alerts: {error.message}
         </p>
-      ) : (data ?? []).length === 0 ? (
-        <p className="text-sm text-muted-foreground">No alerts found.</p>
+      ) : hits.length === 0 ? (
+        <p className="text-sm text-muted">No alerts found.</p>
       ) : (
         <div className="flex flex-col gap-4">
-          {(data ?? []).map((hit) => {
-            const tier = severityTier(hit.detector_name, hit.severity_score)
+          {hits.map((hit) => {
             const filingUrl = sourceFilingUrl(hit)
+            const series = sparkByHitId[hit.id] ?? []
             return (
               <Card
                 key={hit.id}
-                className="relative transition-colors hover:bg-muted/40"
+                className="relative border-default bg-card transition-colors hover:border-hover"
               >
-                {/* Full-card click target. Source-filing anchor below sits above this with z-10. */}
+                {/* Full-card click target. Anchors below sit above this with z-10. */}
                 <Link
                   href={`/alerts/${hit.id}`}
                   aria-label={`View alert details for ${companyLabel(hit)}`}
-                  className="absolute inset-0 z-0 rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  className="absolute inset-0 z-0 rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
                 />
                 <CardHeader className="pb-3">
-                  <div className="flex flex-wrap items-start justify-between gap-2">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <Badge className={severityBadgeClass(tier)}>
-                        {DETECTOR_LABELS[hit.detector_name] ??
-                          hit.detector_name}
-                      </Badge>
-                      <span className="font-mono text-sm text-muted-foreground">
-                        {fundTickerLabel(hit)}
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                      <SeverityRing
+                        severity={hit.severity_score ?? 0}
+                        size={40}
+                        ariaLabel={`Severity ${formatSeverity(
+                          hit.detector_name,
+                          hit.severity_score,
+                        )}`}
+                      />
+                      <div>
+                        <div className="text-[11px] font-mono uppercase tracking-wider text-dim">
+                          {DETECTOR_LABELS[hit.detector_name] ??
+                            hit.detector_name}
+                          {" · "}
+                          {fundTickerLabel(hit)}
+                        </div>
+                        <CardTitle className="mt-0.5 text-lg text-default">
+                          {companyLabel(hit)}
+                        </CardTitle>
+                      </div>
+                    </div>
+                    <div className="flex shrink-0 flex-col items-end gap-1">
+                      <span className="text-xs text-dim">
+                        {hit.current_period_end
+                          ? format(
+                              new Date(hit.current_period_end),
+                              "MMM d, yyyy",
+                            )
+                          : format(new Date(hit.created_at), "MMM d, yyyy")}
+                      </span>
+                      <HitSparkline
+                        detector={hit.detector_name}
+                        data={series}
+                        width={140}
+                        height={36}
+                      />
+                      <span className="text-[10px] font-mono uppercase tracking-wider text-dim">
+                        {hit.detector_name === "pik_creep"
+                          ? "PIK share · 8q"
+                          : "FV · 8q"}
                       </span>
                     </div>
-                    <span className="text-xs text-muted-foreground">
-                      {hit.current_period_end
-                        ? format(
-                            new Date(hit.current_period_end),
-                            "MMM d, yyyy",
-                          )
-                        : format(new Date(hit.created_at), "MMM d, yyyy")}
-                    </span>
                   </div>
-                  <CardTitle className="mt-2 text-lg">
-                    {companyLabel(hit)}
-                  </CardTitle>
                 </CardHeader>
                 <CardContent className="pt-0">
-                  <p className="text-sm">{summarize(hit)}</p>
-                  <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
+                  <p className="text-sm text-default">{summarize(hit)}</p>
+                  <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs text-muted">
                     <span>
                       Severity:{" "}
-                      <span className="font-medium text-foreground">
-                        {formatSeverity(hit.detector_name, hit.severity_score)}
+                      <span className="font-medium text-default">
+                        {formatSeverity(
+                          hit.detector_name,
+                          hit.severity_score,
+                        )}
                       </span>
                     </span>
                     <span className="flex items-center gap-3">
@@ -177,7 +215,7 @@ export default async function AlertsPage({
                           Source filing →
                         </a>
                       )}
-                      <span className="text-primary">View details →</span>
+                      <span className="text-accent">View details →</span>
                     </span>
                   </div>
                 </CardContent>
@@ -189,31 +227,31 @@ export default async function AlertsPage({
 
       {totalPages > 1 && (
         <div className="mt-8 flex items-center justify-between text-sm">
-          <span className="text-muted-foreground">
+          <span className="text-muted">
             Page {pageNum} of {totalPages} · {totalCount} total
           </span>
           <div className="flex gap-2">
             {pageNum > 1 ? (
               <Link
                 href={buildHref(activeDetector, pageNum - 1)}
-                className="rounded-md border px-3 py-1.5 hover:bg-muted"
+                className="rounded-md border border-default px-3 py-1.5 text-default hover:border-hover"
               >
                 ← Previous
               </Link>
             ) : (
-              <span className="cursor-not-allowed rounded-md border px-3 py-1.5 text-muted-foreground opacity-50">
+              <span className="cursor-not-allowed rounded-md border border-default px-3 py-1.5 text-dim opacity-50">
                 ← Previous
               </span>
             )}
             {pageNum < totalPages ? (
               <Link
                 href={buildHref(activeDetector, pageNum + 1)}
-                className="rounded-md border px-3 py-1.5 hover:bg-muted"
+                className="rounded-md border border-default px-3 py-1.5 text-default hover:border-hover"
               >
                 Next →
               </Link>
             ) : (
-              <span className="cursor-not-allowed rounded-md border px-3 py-1.5 text-muted-foreground opacity-50">
+              <span className="cursor-not-allowed rounded-md border border-default px-3 py-1.5 text-dim opacity-50">
                 Next →
               </span>
             )}

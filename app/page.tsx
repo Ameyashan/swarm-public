@@ -12,6 +12,7 @@ import {
 import { TopBorrowers, type TopBorrower } from "@/components/home/top-borrowers"
 import { RecentAlertCard } from "@/components/home/recent-alert-card"
 import { type DetectorHit } from "./alerts/alerts-helpers"
+import { fetchSparklineDataForHits } from "@/lib/sparkline-data"
 
 export const dynamic = "force-dynamic"
 
@@ -180,6 +181,10 @@ export default async function Home() {
   }))
 
   const recentAlerts = recentAlertsRes.data ?? []
+  const { byHitId: recentAlertsSparklines } =
+    recentAlerts.length > 0
+      ? await fetchSparklineDataForHits(recentAlerts)
+      : { byHitId: {} as Record<string, { x: string; y: number }[]> }
 
   // ---------- Render ----------
   return (
@@ -301,7 +306,12 @@ export default async function Home() {
         ) : (
           <div className="flex flex-col gap-3">
             {recentAlerts.map((hit, idx) => (
-              <RecentAlertCard key={hit.id} hit={hit} index={idx} />
+              <RecentAlertCard
+                key={hit.id}
+                hit={hit}
+                index={idx}
+                series={recentAlertsSparklines[hit.id] ?? []}
+              />
             ))}
           </div>
         )}

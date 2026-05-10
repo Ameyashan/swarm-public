@@ -3,6 +3,9 @@ import { notFound } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { ObservationsTable } from "./observations-table"
+import { AnimatedNumber } from "@/components/charts/AnimatedNumber"
+import { Sparkline, type SparklinePoint } from "@/components/charts/Sparkline"
+import { format } from "date-fns"
 
 // Server-render every request so we always read the latest filing.
 export const dynamic = "force-dynamic"
@@ -131,51 +134,133 @@ export default async function FundPage({
   ).length
   const pikCount = observations.filter((o) => o.is_pik === true).length
 
+  // 5) Fund-level history series for the sparkline (FV by period)
+  type FundFvRow = {
+    period_end: string
+    fv_thousands: number | string
+    positions: number | string
+    non_accrual_count: number | string
+  }
+  const { data: fundSeriesRaw } = await supabase.rpc("fund_fv_series", {
+    ticker,
+  })
+  const fundSeries: SparklinePoint[] = ((fundSeriesRaw ?? []) as FundFvRow[])
+    .map((r) => ({ x: r.period_end, y: Number(r.fv_thousands) }))
+    .sort((a, b) => String(a.x).localeCompare(String(b.x)))
+
+  // Headline values for AnimatedNumber
+  const fvMillions = totalFairValue / 1000
+  const fvUsesB = Math.abs(fvMillions) >= 1000
+  const fvHeadlineValue = fvUsesB ? fvMillions / 1000 : fvMillions
+  const fvHeadlineSuffix = fvUsesB ? "B" : "M"
+  const fvHeadlineDecimals = fvUsesB ? 2 : 1
+
   return (
     <main className="mx-auto flex min-h-screen max-w-7xl flex-col px-6 py-12">
       <BackLink />
 
-      <header className="mb-8">
-        <h1 className="text-4xl font-bold tracking-tight sm:text-5xl">
-          {fund.ticker}
-        </h1>
-        <p className="mt-2 text-lg text-muted-foreground">{fund.name}</p>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Most recent filing:{" "}
-          <span className="font-medium text-foreground">
-            {filing.filing_type}
-          </span>{" "}
-          for period ending{" "}
-          <span className="font-medium text-foreground">
-            {filing.period_end}
-          </span>{" "}
-          (filed {filing.filing_date},{" "}
-          <span className="font-mono">{filing.accession_number}</span>)
-        </p>
+      <header className="mb-8 flex flex-wrap items-start justify-between gap-6">
+        <div>
+          <h1 className="text-4xl font-bold tracking-tight text-default sm:text-5xl">
+            {fund.ticker}
+          </h1>
+          <p className="mt-2 text-lg text-muted">{fund.name}</p>
+          <p className="mt-1 text-sm text-dim">
+            Most recent filing:{" "}
+            <span className="font-medium text-default">
+              {filing.filing_type}
+            </span>{" "}
+            for period ending{" "}
+            <span className="font-medium text-default">
+              {filing.period_end}
+            </span>{" "}
+            (filed {filing.filing_date},{" "}
+            <span className="font-mono">{filing.accession_number}</span>)
+          </p>
+        </div>
+        {fundSeries.length > 1 && (
+          <div className="flex flex-col items-end gap-1">
+            <span className="text-[11px] font-mono uppercase tracking-wider text-dim">
+              Total fair value · history
+            </span>
+            <Sparkline
+              data={fundSeries}
+              width={280}
+              height={56}
+              color="#3B82F6"
+              formatValue={(v) =>
+                Math.abs(v / 1000) >= 1000
+                  ? `$${(v / 1_000_000).toFixed(2)}B`
+                  : `$${(v / 1000).toFixed(1)}M`
+              }
+              formatLabel={(x) => {
+                try {
+                  return format(new Date(String(x)), "MMM yyyy")
+                } catch {
+                  return String(x)
+                }
+              }}
+            />
+            <span className="text-[10px] font-mono uppercase tracking-wider text-dim">
+              {fundSeries.length} periods
+            </span>
+          </div>
+        )}
       </header>
 
       {/* Summary cards */}
       <section className="mb-8 grid grid-cols-2 gap-4 md:grid-cols-5">
-        <SummaryCard
-          label="Total positions"
-          value={totalPositions.toLocaleString()}
-        />
-        <SummaryCard
-          label="Total fair value"
-          value={formatThousands(totalFairValue)}
-          hint="$ in thousands"
-        />
-        <SummaryCard
-          label="Total cost"
-          value={formatThousands(totalCost)}
-          hint="$ in thousands"
-        />
-        <SummaryCard
-          label="Non-accrual"
-          value={nonAccrualCount.toLocaleString()}
-          accent={nonAccrualCount > 0 ? "danger" : "default"}
-        />
-        <SummaryCard label="PIK" value={pikCount.toLocaleString()} />
+        <SummaryCard label="Total positions">
+          <AnimatedNumber
+            value={totalPositions}
+            duration={1.5}
+            numberClassName="inline-flex items-baseline gap-0.5 text-2xl font-bold tabular-nums text-default"
+          />
+        </SummaryCard>
+        <SummaryCard label="Total fair value" hint="$ in thousands">
+          <AnimatedNumber
+            value={fvHeadlineValue}
+            prefix="$"
+            suffix={fvHeadlineSuffix}
+            decimals={fvHeadlineDecimals}
+            duration={1.5}
+            numberClassName="inline-flex items-baseline gap-0.5 text-2xl font-bold tabular-nums text-default"
+          />
+        </SummaryCard>
+        <SummaryCard label="Total cost" hint="$ in thousands">
+          {(() => {
+            const costM = totalCost / 1000
+            const usesB = Math.abs(costM) >= 1000
+            return (
+              <AnimatedNumber
+                value={usesB ? costM / 1000 : costM}
+                prefix="$"
+                suffix={usesB ? "B" : "M"}
+                decimals={usesB ? 2 : 1}
+                duration={1.5}
+                numberClassName="inline-flex items-baseline gap-0.5 text-2xl font-bold tabular-nums text-default"
+              />
+            )
+          })()}
+        </SummaryCard>
+        <SummaryCard label="Non-accrual">
+          <AnimatedNumber
+            value={nonAccrualCount}
+            duration={1.5}
+            numberClassName={
+              nonAccrualCount > 0
+                ? "inline-flex items-baseline gap-0.5 text-2xl font-bold tabular-nums text-severity-critical"
+                : "inline-flex items-baseline gap-0.5 text-2xl font-bold tabular-nums text-default"
+            }
+          />
+        </SummaryCard>
+        <SummaryCard label="PIK">
+          <AnimatedNumber
+            value={pikCount}
+            duration={1.5}
+            numberClassName="inline-flex items-baseline gap-0.5 text-2xl font-bold tabular-nums text-default"
+          />
+        </SummaryCard>
       </section>
 
       {/* Observations table (client component for sort + filter) */}
@@ -202,50 +287,28 @@ function BackLink() {
 
 function SummaryCard({
   label,
-  value,
   hint,
-  accent = "default",
+  children,
 }: {
   label: string
-  value: string
   hint?: string
-  accent?: "default" | "danger"
+  children: React.ReactNode
 }) {
   return (
-    <Card>
+    <Card className="border-default bg-card">
       <CardHeader className="pb-2">
-        <CardTitle className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+        <CardTitle className="text-[11px] font-mono uppercase tracking-wider text-dim">
           {label}
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <div
-          className={
-            accent === "danger"
-              ? "text-2xl font-bold text-destructive"
-              : "text-2xl font-bold"
-          }
-        >
-          {value}
-        </div>
+        {children}
         {hint ? (
-          <p className="mt-1 text-xs text-muted-foreground">{hint}</p>
+          <p className="mt-1 text-xs text-dim">{hint}</p>
         ) : null}
       </CardContent>
     </Card>
   )
 }
 
-function formatThousands(n: number): string {
-  if (!Number.isFinite(n) || n === 0) return "$0"
-  // values are stored in $thousands; $1,000 (k) = $1M
-  const millions = n / 1_000
-  if (Math.abs(millions) >= 1_000) {
-    return `$${(millions / 1_000).toLocaleString(undefined, {
-      maximumFractionDigits: 2,
-    })}B`
-  }
-  return `$${millions.toLocaleString(undefined, {
-    maximumFractionDigits: 1,
-  })}M`
-}
+

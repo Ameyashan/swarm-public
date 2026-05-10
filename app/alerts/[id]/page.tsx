@@ -8,7 +8,6 @@ import {
   DETECTOR_LABELS,
   type DetectorHit,
   severityTier,
-  severityBadgeClass,
   summarize,
   sourceFilingUrl,
   fundTickerLabel,
@@ -17,6 +16,9 @@ import {
 } from "../alerts-helpers"
 import { CopySummaryButton } from "./copy-summary-button"
 import { encodeCanonicalSlug } from "@/lib/slug"
+import { SeverityRing } from "@/components/charts/SeverityRing"
+import { AnimatedNumber } from "@/components/charts/AnimatedNumber"
+import { FvHistoryChart, type FvHistoryRow } from "@/components/charts/FvHistoryChart"
 
 export const dynamic = "force-dynamic"
 
@@ -191,6 +193,93 @@ export default async function AlertDetailPage({
 
   const tier = severityTier(hit.detector_name, hit.severity_score)
 
+  // ---------------------------------------------------------------------
+  // Headline metric (animated number) and FV history series
+  // ---------------------------------------------------------------------
+  type Headline = {
+    value: number
+    prefix?: string
+    suffix?: string
+    decimals?: number
+    label: string
+    tone: "danger" | "warning" | "default"
+  }
+  let headline: Headline | null = null
+  if (hit.detector_name === "mark_drift_down") {
+    const prior = Number(hit.hit_data?.fv_prior ?? 0)
+    const current = Number(hit.hit_data?.fv_current ?? 0)
+    const drop = Math.max(0, prior - current)
+    const dropM = drop / 1000
+    if (Number.isFinite(dropM) && dropM > 0) {
+      headline =
+        Math.abs(dropM) >= 1000
+          ? {
+              value: dropM / 1000,
+              prefix: "$",
+              suffix: "B",
+              decimals: 2,
+              label: "Fair-value drop",
+              tone: "danger",
+            }
+          : {
+              value: dropM,
+              prefix: "$",
+              suffix: "M",
+              decimals: dropM >= 10 ? 1 : 2,
+              label: "Fair-value drop",
+              tone: "danger",
+            }
+    }
+  } else if (hit.detector_name === "pik_creep") {
+    const deltaPp = Number(hit.hit_data?.delta_pp ?? 0)
+    if (Number.isFinite(deltaPp)) {
+      headline = {
+        value: deltaPp,
+        suffix: " pp",
+        decimals: 1,
+        label: "PIK share increase",
+        tone: "warning",
+      }
+    }
+  } else if (hit.detector_name === "cross_fund_divergence") {
+    const spread = Number(hit.hit_data?.spread_pp ?? 0)
+    if (Number.isFinite(spread)) {
+      headline = {
+        value: spread,
+        suffix: " pp",
+        decimals: 1,
+        label: "FV/Cost spread across funds",
+        tone: "warning",
+      }
+    }
+  }
+
+  // FV history (across all funds) for the borrower. For PIK creep we don't
+  // have a borrower, so we skip the chart and show fund-level context elsewhere.
+  let fvHistory: FvHistoryRow[] = []
+  if (
+    hit.detector_name !== "pik_creep" &&
+    hit.portfolio_company_canonical
+  ) {
+    const { data: seriesRaw } = await supabase.rpc("borrower_fv_series", {
+      borrowers: [hit.portfolio_company_canonical],
+      quarters: 999,
+    })
+    type SeriesRow = {
+      portfolio_company_canonical: string
+      period_end: string
+      fv_thousands: number | string
+    }
+    const grouped = new Map<string, number>()
+    for (const r of (seriesRaw ?? []) as SeriesRow[]) {
+      const prev = grouped.get(r.period_end) ?? 0
+      grouped.set(r.period_end, prev + Number(r.fv_thousands))
+    }
+    fvHistory = Array.from(grouped.entries())
+      .map(([period_end, fv_thousands]) => ({ period_end, fv_thousands }))
+      .sort((a, b) => a.period_end.localeCompare(b.period_end))
+  }
+
   // Find observations for this hit. For mark_drift_down we want both prior and
   // current period for the (fund, canonical) pair. For cross_fund_divergence
   // we want the current period across all funds in hit_data.funds[].
@@ -302,50 +391,92 @@ export default async function AlertDetailPage({
       </div>
 
       <header className="mb-8">
-        <div className="mb-3 flex flex-wrap items-center gap-2">
-          <Badge className={severityBadgeClass(tier)}>
-            {DETECTOR_LABELS[hit.detector_name] ?? hit.detector_name}
-          </Badge>
-          <span className="font-mono text-sm text-muted-foreground">
-            {fundTickerLabel(hit)}
-          </span>
-          <span className="text-xs text-muted-foreground">
-            · severity{" "}
-            <span className="font-medium text-foreground">
-              {formatSeverity(hit.detector_name, hit.severity_score)}
-            </span>
-          </span>
-        </div>
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">
-              {companyLabel(hit)}
-            </h1>
-            {hit.portfolio_company_canonical && (
-              <Link
-                href={`/watch/${encodeCanonicalSlug(hit.portfolio_company_canonical)}`}
-                className="mt-1 inline-block text-sm text-primary underline-offset-4 hover:underline"
-              >
-                Watch this borrower →
-              </Link>
-            )}
-            <p className="mt-2 text-lg text-muted-foreground">
-              {summarize(hit)}
-            </p>
-            <p className="mt-1 text-sm text-muted-foreground">
-              {hit.prior_period_end ? (
-                <>
-                  {fmtDate(hit.prior_period_end)} →{" "}
-                  {fmtDate(hit.current_period_end)}
-                </>
-              ) : (
-                <>{fmtDate(hit.current_period_end)}</>
+        <div className="flex flex-wrap items-start justify-between gap-6">
+          <div className="flex items-start gap-5">
+            <SeverityRing
+              severity={hit.severity_score ?? 0}
+              size={80}
+              ariaLabel={`Severity ${formatSeverity(hit.detector_name, hit.severity_score)} (${tier})`}
+            />
+            <div>
+              <div className="text-[11px] font-mono uppercase tracking-wider text-dim">
+                {DETECTOR_LABELS[hit.detector_name] ?? hit.detector_name}
+                {" · "}
+                {fundTickerLabel(hit)}
+                {" · severity "}
+                <span className="text-default">
+                  {formatSeverity(hit.detector_name, hit.severity_score)}
+                </span>
+              </div>
+              <h1 className="mt-1 text-3xl font-bold tracking-tight text-default sm:text-4xl">
+                {companyLabel(hit)}
+              </h1>
+              {hit.portfolio_company_canonical && (
+                <Link
+                  href={`/watch/${encodeCanonicalSlug(hit.portfolio_company_canonical)}`}
+                  className="mt-1 inline-block text-sm text-accent underline-offset-4 hover:underline"
+                >
+                  Watch this borrower →
+                </Link>
               )}
-            </p>
+              <p className="mt-2 text-base text-muted">{summarize(hit)}</p>
+              <p className="mt-1 text-sm text-dim">
+                {hit.prior_period_end ? (
+                  <>
+                    {fmtDate(hit.prior_period_end)} →{" "}
+                    {fmtDate(hit.current_period_end)}
+                  </>
+                ) : (
+                  <>{fmtDate(hit.current_period_end)}</>
+                )}
+              </p>
+            </div>
           </div>
           <CopySummaryButton markdown={markdown} />
         </div>
+
+        {headline && (
+          <div className="mt-6 rounded-lg border border-default bg-card px-6 py-5">
+            <div className="text-[11px] font-mono uppercase tracking-wider text-dim">
+              {headline.label}
+            </div>
+            <div className="mt-1">
+              <AnimatedNumber
+                value={headline.value}
+                prefix={headline.prefix}
+                suffix={headline.suffix}
+                decimals={headline.decimals ?? 0}
+                duration={1.5}
+                numberClassName={
+                  headline.tone === "danger"
+                    ? "inline-flex items-baseline gap-0.5 text-4xl font-bold tabular-nums text-severity-critical sm:text-5xl"
+                    : headline.tone === "warning"
+                      ? "inline-flex items-baseline gap-0.5 text-4xl font-bold tabular-nums text-severity-high sm:text-5xl"
+                      : "inline-flex items-baseline gap-0.5 text-4xl font-bold tabular-nums text-default sm:text-5xl"
+                }
+              />
+            </div>
+          </div>
+        )}
       </header>
+
+      {fvHistory.length > 0 && (
+        <section className="mb-10">
+          <h2 className="mb-3 text-xl font-semibold tracking-tight text-default">
+            Fair-value history
+          </h2>
+          <Card className="border-default bg-card">
+            <CardContent className="p-6">
+              <FvHistoryChart
+                data={fvHistory}
+                height={300}
+                color={tier === "severe" ? "#EF4444" : "#3B82F6"}
+                title={`${companyLabel(hit)} · total fair value across all funds`}
+              />
+            </CardContent>
+          </Card>
+        </section>
+      )}
 
       {/* Hit details (raw hit_data, exposed for transparency) */}
       <section className="mb-10">
