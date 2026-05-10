@@ -5,8 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { ObservationsTable } from "./observations-table"
 import { AnimatedNumber } from "@/components/charts/AnimatedNumber"
 import { Sparkline, type SparklinePoint } from "@/components/charts/Sparkline"
-import { format } from "date-fns"
-import { toDollars, formatFV } from "@/lib/format"
+import { toDollars } from "@/lib/format"
 
 import type { Metadata } from "next"
 
@@ -220,14 +219,6 @@ export default async function FundPage({
               width={280}
               height={56}
               color="#3B82F6"
-              formatValue={(v) => formatFV(v)}
-              formatLabel={(x) => {
-                try {
-                  return format(new Date(String(x)), "MMM yyyy")
-                } catch {
-                  return String(x)
-                }
-              }}
             />
             <span className="text-[10px] font-mono uppercase tracking-wider text-dim">
               {fundSeries.length} periods
