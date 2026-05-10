@@ -417,10 +417,6 @@ export default async function DriftPage({
                             : "#3B82F6"
                         }
                         animate={false}
-                        formatValue={(n) => fmtUsdK(n)}
-                        formatLabel={(x) =>
-                          format(new Date(String(x)), "MMM yyyy")
-                        }
                       />
                     </td>
                     <td className="px-3 py-2.5 align-middle">
