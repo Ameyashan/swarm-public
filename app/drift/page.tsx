@@ -5,6 +5,7 @@ import { encodeCanonicalSlug } from "@/lib/slug"
 import { Sparkline } from "@/components/charts/Sparkline"
 import { AnimatedNumber } from "@/components/charts/AnimatedNumber"
 import { DriftFilters } from "@/components/drift/drift-filters"
+import { DriftToast } from "./drift-toast"
 import {
   DETECTOR_LABELS,
   formatSeverity,
@@ -201,8 +202,17 @@ export default async function DriftPage({
     })
   }
 
+  const driftSignature = JSON.stringify({
+    minFv: minFvStr,
+    accrual,
+    funds: fundFilter,
+    sort: sortKey,
+    dir: sortDir,
+  })
+
   return (
     <main className="mx-auto flex min-h-screen max-w-7xl flex-col px-6 py-12 sm:py-16">
+      <DriftToast count={totalCount} signature={driftSignature} />
       <header className="mb-8">
         <div className="mb-2 text-sm">
           <Link

@@ -17,6 +17,7 @@ import { encodeCanonicalSlug } from "@/lib/slug"
 import { SeverityRing } from "@/components/charts/SeverityRing"
 import { HitSparkline } from "@/components/charts/HitSparkline"
 import { fetchSparklineDataForHits } from "@/lib/sparkline-data"
+import { AlertsToast } from "./alerts-toast"
 
 export const dynamic = "force-dynamic"
 
@@ -124,8 +125,15 @@ export default async function AlertsPage({
     return qs ? `/alerts?${qs}` : "/alerts"
   }
 
+  const filterSignature = JSON.stringify({
+    detector: activeDetector,
+    fund: fundFilter,
+    quarter: quarterFilter,
+  })
+
   return (
     <main className="mx-auto flex min-h-screen max-w-4xl flex-col px-6 py-12 sm:py-16">
+      <AlertsToast count={totalCount} signature={filterSignature} />
       <header className="mb-8">
         <div className="mb-2 text-sm">
           <Link

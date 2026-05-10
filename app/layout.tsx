@@ -4,6 +4,8 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import { NavBar } from "@/components/nav-bar";
 import { SiteFooter } from "@/components/site-footer";
+import { CommandPalette } from "@/components/command-palette";
+import { Toaster } from "sonner";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -41,6 +43,20 @@ export default function RootLayout({
         <NavBar />
         <div className="flex-1">{children}</div>
         <SiteFooter />
+        <CommandPalette />
+        <Toaster
+          theme="dark"
+          position="bottom-right"
+          closeButton
+          richColors={false}
+          toastOptions={{
+            style: {
+              background: "#0F1623",
+              border: "1px solid #1F2937",
+              color: "#E5E7EB",
+            },
+          }}
+        />
       </body>
     </html>
   );
