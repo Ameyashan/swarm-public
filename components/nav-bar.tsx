@@ -1,65 +1,83 @@
 import Link from "next/link"
-import { Suspense } from "react"
-import { FreshnessIndicator } from "@/components/freshness-indicator"
 
-const NAV_LINKS = [
-  { href: "/", label: "Home" },
-  { href: "/heatmap", label: "Heatmap" },
-  { href: "/drift", label: "Drift" },
-  { href: "/funds", label: "Funds" },
-  { href: "/alerts", label: "Alerts" },
-  { href: "/case-studies", label: "Case Studies" },
-  { href: "/about", label: "About" },
+// Six surfaces of the PM workflow, in the exact order required by the spec.
+// Path "/borrower/MRI%20Software" matches the prompt verbatim — the borrower
+// X-ray landing route uses MRI Software as the default canonical example.
+export const PM_NAV: Array<{
+  href: string
+  label: string
+  badge?: string
+}> = [
+  { href: "/", label: "Briefing" },
+  { href: "/book", label: "Position book" },
+  { href: "/borrower/MRI%20Software", label: "Borrower x-ray" },
+  { href: "/peer", label: "Peer telemetry" },
+  { href: "/patterns", label: "Patterns" },
+  { href: "/memo", label: "Memo composer" },
 ]
 
 export function NavBar() {
   return (
-    <header className="sticky top-0 z-30 w-full border-b bg-background/80 backdrop-blur">
-      <div className="mx-auto flex h-14 max-w-6xl items-center justify-between gap-3 px-6">
+    <header
+      className="sticky top-0 z-30 h-12 w-full border-b backdrop-blur"
+      style={{
+        background: "rgba(245, 241, 232, 0.92)",
+        borderColor: "var(--line)",
+      }}
+    >
+      <div className="mx-auto flex h-full max-w-[1280px] items-center gap-4 px-6">
         <Link
           href="/"
-          className="font-mono text-sm font-semibold tracking-tight"
+          className="flex items-center gap-2 font-mono text-[13px] font-medium tracking-tight text-text"
         >
-          swarm/public
+          <span
+            className="flex h-[18px] w-[18px] items-center justify-center rounded-[3px] font-mono text-[11px] font-semibold"
+            style={{ background: "var(--gs)", color: "var(--bg)" }}
+            aria-hidden
+          >
+            s
+          </span>
+          <span>swarm</span>
         </Link>
-        <nav className="flex items-center gap-1 text-sm">
-          {NAV_LINKS.map((l) => (
+
+        <nav className="ml-3 flex items-center gap-[2px]" aria-label="PM workspace">
+          {PM_NAV.map((l) => (
             <Link
               key={l.href}
               href={l.href}
-              className="rounded-md px-3 py-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+              className="rounded-[5px] px-3 py-[7px] font-mono text-[11.5px] text-text-dim transition-colors hover:bg-bg-2 hover:text-text"
             >
               {l.label}
             </Link>
           ))}
         </nav>
-        <div className="hidden items-center gap-3 sm:flex">
-          <CommandHint />
-          <Suspense fallback={<FreshnessFallback />}>
-            <FreshnessIndicator />
-          </Suspense>
+
+        <div className="ml-auto flex items-center gap-3 font-mono text-[11px] text-text-dim">
+          <span className="flex items-center gap-2">
+            <span className="pulse-dot" aria-hidden />
+            <span>live · EDGAR</span>
+          </span>
+          <span
+            className="flex items-center gap-2 rounded-full border px-[10px] py-1 pl-1"
+            style={{ borderColor: "var(--line)" }}
+          >
+            <span
+              className="flex h-[22px] w-[22px] items-center justify-center rounded-full text-[9.5px] font-semibold"
+              style={{
+                background:
+                  "linear-gradient(135deg, var(--gs), #6b5618)",
+                color: "var(--bg)",
+                fontFamily: "var(--font-mono)",
+              }}
+              aria-hidden
+            >
+              AS
+            </span>
+            <span style={{ color: "var(--gs)" }}>Goldman Sachs</span>
+            <span className="text-text-dim">· PM</span>
+          </span>
         </div>
       </div>
     </header>
-  )
-}
-
-function CommandHint() {
-  return (
-    <button
-      data-cmdk-trigger
-      type="button"
-      className="hidden md:inline-flex items-center gap-1.5 rounded-md border border-border bg-[#0F1623] px-2 py-1 text-[11px] text-muted-foreground transition-colors hover:border-blue-500/30 hover:text-foreground"
-      aria-label="Open command palette"
-    >
-      <span>Search</span>
-      <kbd className="font-mono text-[10px]">⌘K</kbd>
-    </button>
-  )
-}
-
-function FreshnessFallback() {
-  return (
-    <div className="inline-flex h-[24px] w-[58px] items-center rounded-full border border-border bg-[#0F1623]" />
   )
 }

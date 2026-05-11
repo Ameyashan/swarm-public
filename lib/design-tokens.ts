@@ -1,47 +1,40 @@
-// Centralized design tokens for the Swarm Public app.
-// Keep this file in sync with tailwind.config.ts (semantic color names) and
-// app/globals.css (CSS variables consumed by shadcn/ui).
+// Centralized design tokens for the Swarm PM workspace.
+// Keep this file in sync with tailwind.config.ts and app/globals.css.
+//
+// Strict semantics — do not reuse a color outside its assigned role:
+//   accent  (terracotta)  — editorial accent / headline block only
+//   gs      (Goldman gold) — Goldman identity / GSCR + GSBD / ★ glyphs
+//   red     (brick red)    — critical severity only (sev >= 70)
+//   amber   (mustard)      — watch signal only (sev 40-70 / elevated PIK)
+//   green   (sage)         — healthy / positive credit signal only
 
 export const colors = {
-  bg: '#0A0E1A',
-  bgElevated: '#111827',
-  bgCard: '#0F1623',
-  border: '#1F2937',
-  borderHover: '#374151',
-  text: '#F3F4F6',
-  textMuted: '#9CA3AF',
-  textDim: '#6B7280',
-  accent: '#3B82F6',
-  accentDim: '#1E3A8A',
+  bg: "#f5f1e8",
+  bg1: "#faf7ee",
+  bg2: "#efe9d9",
+  bg3: "#e7e0cc",
+  line: "#d8cfb5",
+  line2: "#c2b899",
+  text: "#2a2520",
+  textDim: "#6b6358",
+  textFaint: "#948b7c",
+  accent: "#bd5d3c",
+  accentSoft: "#f0d9cb",
+  red: "#a8412a",
+  redBg: "#f3dcd2",
+  amber: "#a8841f",
+  amberBg: "#f0e4c0",
+  green: "#4a7c4f",
+  greenBg: "#d9e6d2",
+  gs: "#8a6f1d",
+  gsBg: "rgba(138, 111, 29, 0.08)",
+} as const
 
-  severity: {
-    critical: '#EF4444', // >50%
-    high: '#F59E0B',     // 30-50%
-    medium: '#FBBF24',   // 10-30%
-    low: '#6B7280',      // <10%
-  },
+export type Severity = "critical" | "watch" | "info" | "ok"
 
-  status: {
-    accrual: '#10B981',
-    nonAccrual: '#EF4444',
-    pik: '#F59E0B',
-  },
-} as const;
-
-export const motion = {
-  spring: { type: 'spring', stiffness: 200, damping: 25 },
-  smooth: { duration: 0.4, ease: [0.32, 0.72, 0, 1] },
-  fast: { duration: 0.2, ease: 'easeOut' },
-} as const;
-
-export type SeverityLevel = keyof typeof colors.severity;
-export type StatusLevel = keyof typeof colors.status;
-
-/** Bucket a percentage drop into a severity level. */
-export function severityFor(pct: number): SeverityLevel {
-  const abs = Math.abs(pct);
-  if (abs > 50) return 'critical';
-  if (abs >= 30) return 'high';
-  if (abs >= 10) return 'medium';
-  return 'low';
+/** Bucket a 0-100 severity into a strict semantic. */
+export function severityBucket(sev100: number): Severity {
+  if (sev100 >= 70) return "critical"
+  if (sev100 >= 40) return "watch"
+  return "info"
 }

@@ -1,25 +1,39 @@
 import type { Config } from "tailwindcss";
 
-// Raw design tokens — keep these in lockstep with lib/design-tokens.ts.
+/*
+  Literal palette from the Commit 1 contract. Keep these in lockstep with
+  app/globals.css (CSS variables) and lib/design-tokens.ts. Any new color must
+  exist here AND in globals.css AND must map to a documented semantic role.
+
+  Strict semantics:
+    accent (terracotta)  — editorial accent / headline block only
+    gs     (Goldman gold) — Goldman identity / GSCR + GSBD / ★ glyphs
+    red    (brick red)    — critical severity only (sev >= 70)
+    amber  (mustard)      — watch signal only (sev 40-70 / elevated PIK)
+    green  (sage)         — healthy / positive credit signal only
+*/
+
 const tokens = {
-  bg: "#0A0E1A",
-  bgElevated: "#111827",
-  bgCard: "#0F1623",
-  border: "#1F2937",
-  borderHover: "#374151",
-  text: "#F3F4F6",
-  textMuted: "#9CA3AF",
-  textDim: "#6B7280",
-  accent: "#3B82F6",
-  accentDim: "#1E3A8A",
-  severityCritical: "#EF4444",
-  severityHigh: "#F59E0B",
-  severityMedium: "#FBBF24",
-  severityLow: "#6B7280",
-  statusAccrual: "#10B981",
-  statusNonAccrual: "#EF4444",
-  statusPik: "#F59E0B",
-};
+  bg: "#f5f1e8",
+  bg1: "#faf7ee",
+  bg2: "#efe9d9",
+  bg3: "#e7e0cc",
+  line: "#d8cfb5",
+  line2: "#c2b899",
+  text: "#2a2520",
+  textDim: "#6b6358",
+  textFaint: "#948b7c",
+  accent: "#bd5d3c",
+  accentSoft: "#f0d9cb",
+  red: "#a8412a",
+  redBg: "#f3dcd2",
+  amber: "#a8841f",
+  amberBg: "#f0e4c0",
+  green: "#4a7c4f",
+  greenBg: "#d9e6d2",
+  gs: "#8a6f1d",
+  gsBg: "rgba(138, 111, 29, 0.08)",
+} as const;
 
 const config: Config = {
   darkMode: ["class"],
@@ -32,74 +46,81 @@ const config: Config = {
     extend: {
       fontFamily: {
         sans: ["var(--font-inter)", "Inter", "system-ui", "sans-serif"],
+        serif: [
+          "var(--font-serif)",
+          "Source Serif Pro",
+          "Source Serif 4",
+          "Georgia",
+          "serif",
+        ],
+        mono: [
+          "var(--font-mono)",
+          "JetBrains Mono",
+          "ui-monospace",
+          "monospace",
+        ],
       },
 
-      // Semantic background-color utilities: bg-surface, bg-elevated, bg-card
       backgroundColor: {
-        surface: tokens.bg,
-        elevated: tokens.bgElevated,
-        card: tokens.bgCard,
+        bg: tokens.bg,
+        "bg-1": tokens.bg1,
+        "bg-2": tokens.bg2,
+        "bg-3": tokens.bg3,
         accent: tokens.accent,
-        "accent-dim": tokens.accentDim,
-        "severity-critical": tokens.severityCritical,
-        "severity-high": tokens.severityHigh,
-        "severity-medium": tokens.severityMedium,
-        "severity-low": tokens.severityLow,
-        "status-accrual": tokens.statusAccrual,
-        "status-non-accrual": tokens.statusNonAccrual,
-        "status-pik": tokens.statusPik,
+        "accent-soft": tokens.accentSoft,
+        red: tokens.red,
+        "red-bg": tokens.redBg,
+        amber: tokens.amber,
+        "amber-bg": tokens.amberBg,
+        green: tokens.green,
+        "green-bg": tokens.greenBg,
+        gs: tokens.gs,
+        "gs-bg": tokens.gsBg,
       },
 
-      // Semantic border-color utilities: border-default, border-hover
       borderColor: {
-        default: tokens.border,
-        hover: tokens.borderHover,
+        line: tokens.line,
+        "line-2": tokens.line2,
         accent: tokens.accent,
-        "severity-critical": tokens.severityCritical,
-        "severity-high": tokens.severityHigh,
-        "severity-medium": tokens.severityMedium,
-        "severity-low": tokens.severityLow,
+        red: tokens.red,
+        amber: tokens.amber,
+        green: tokens.green,
+        gs: tokens.gs,
       },
 
-      // Semantic text-color utilities: text-default, text-muted, text-dim
       textColor: {
-        default: tokens.text,
-        muted: tokens.textMuted,
-        dim: tokens.textDim,
+        text: tokens.text,
+        "text-dim": tokens.textDim,
+        "text-faint": tokens.textFaint,
         accent: tokens.accent,
-        "severity-critical": tokens.severityCritical,
-        "severity-high": tokens.severityHigh,
-        "severity-medium": tokens.severityMedium,
-        "severity-low": tokens.severityLow,
-        "status-accrual": tokens.statusAccrual,
-        "status-non-accrual": tokens.statusNonAccrual,
-        "status-pik": tokens.statusPik,
+        red: tokens.red,
+        amber: tokens.amber,
+        green: tokens.green,
+        gs: tokens.gs,
       },
 
-      // General colors (covers ring-, fill-, stroke-, etc., plus shadcn vars).
       colors: {
-        // Convenience: also expose semantic names here for non bg/border/text
-        // utilities (ring, divide, fill, etc.).
-        surface: tokens.bg,
-        elevated: tokens.bgElevated,
-        accent: {
-          DEFAULT: tokens.accent,
-          dim: tokens.accentDim,
-          foreground: "hsl(var(--accent-foreground))",
-        },
-        severity: {
-          critical: tokens.severityCritical,
-          high: tokens.severityHigh,
-          medium: tokens.severityMedium,
-          low: tokens.severityLow,
-        },
-        status: {
-          accrual: tokens.statusAccrual,
-          "non-accrual": tokens.statusNonAccrual,
-          pik: tokens.statusPik,
-        },
+        bg: tokens.bg,
+        "bg-1": tokens.bg1,
+        "bg-2": tokens.bg2,
+        "bg-3": tokens.bg3,
+        line: tokens.line,
+        "line-2": tokens.line2,
+        text: tokens.text,
+        "text-dim": tokens.textDim,
+        "text-faint": tokens.textFaint,
+        accent: tokens.accent,
+        "accent-soft": tokens.accentSoft,
+        red: tokens.red,
+        "red-bg": tokens.redBg,
+        amber: tokens.amber,
+        "amber-bg": tokens.amberBg,
+        green: tokens.green,
+        "green-bg": tokens.greenBg,
+        gs: tokens.gs,
+        "gs-bg": tokens.gsBg,
 
-        // shadcn/ui CSS-variable tokens (kept for existing components).
+        // shadcn HSL bridge (used by any leftover components/ui consumers).
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
         ring: "hsl(var(--ring))",
@@ -126,7 +147,7 @@ const config: Config = {
           foreground: "hsl(var(--popover-foreground))",
         },
         card: {
-          DEFAULT: tokens.bgCard,
+          DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
       },
@@ -136,22 +157,9 @@ const config: Config = {
         md: "calc(var(--radius) - 2px)",
         sm: "calc(var(--radius) - 4px)",
       },
-      keyframes: {
-        "accordion-down": {
-          from: { height: "0" },
-          to: { height: "var(--radix-accordion-content-height)" },
-        },
-        "accordion-up": {
-          from: { height: "var(--radix-accordion-content-height)" },
-          to: { height: "0" },
-        },
-      },
-      animation: {
-        "accordion-down": "accordion-down 0.2s ease-out",
-        "accordion-up": "accordion-up 0.2s ease-out",
-      },
     },
   },
   plugins: [require("tailwindcss-animate")],
 };
+
 export default config;
