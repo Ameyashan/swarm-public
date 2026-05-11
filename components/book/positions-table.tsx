@@ -172,7 +172,16 @@ export function PositionsTable({
                       </td>
                       <td className="px-3 py-3 align-top">
                         <div className="font-serif text-[13.5px] leading-[1.3] text-text">
-                          {r.borrower ?? "—"}
+                          {r.borrower ? (
+                            <Link
+                              href={`/borrower/${encodeURIComponent(r.borrower)}`}
+                              className="text-text hover:text-accent hover:underline"
+                            >
+                              {r.borrower}
+                            </Link>
+                          ) : (
+                            "—"
+                          )}
                         </div>
                         {subParts.length > 0 && (
                           <div className="mt-0.5 font-mono text-[10.5px] text-text-faint">
