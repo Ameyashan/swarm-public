@@ -1,0 +1,3213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>swarm — credit intelligence for goldman PMs</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Inter:wght@400;500;600&family=Source+Serif+Pro:ital,wght@0,400;0,500;0,600;0,700;1,400;1,600&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --bg: #f5f1e8;
+    --bg-1: #faf7ee;
+    --bg-2: #efe9d9;
+    --bg-3: #e7e0cc;
+    --line: #d8cfb5;
+    --line-2: #c2b899;
+    --text: #2a2520;
+    --text-dim: #6b6358;
+    --text-faint: #948b7c;
+    --accent: #bd5d3c;
+    --accent-soft: #f0d9cb;
+    --red: #a8412a;
+    --red-bg: #f3dcd2;
+    --amber: #a8841f;
+    --amber-bg: #f0e4c0;
+    --green: #4a7c4f;
+    --green-bg: #d9e6d2;
+    --gs: #8a6f1d;
+    --gs-bg: rgba(138,111,29,0.08);
+    --mono: 'JetBrains Mono', ui-monospace, monospace;
+    --sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    --serif: 'Source Serif Pro', 'Source Serif 4', Georgia, serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 14px;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+    min-height: 100vh;
+  }
+  body {
+    background-image:
+      radial-gradient(circle at 15% -5%, rgba(189,93,60,0.04), transparent 40%),
+      radial-gradient(circle at 90% 110%, rgba(138,111,29,0.03), transparent 40%);
+    background-attachment: fixed;
+  }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; text-underline-offset: 2px; }
+  button { font-family: inherit; cursor: pointer; }
+  input, textarea { font-family: inherit; }
+  .mono { font-family: var(--mono); }
+  .serif { font-family: var(--serif); font-style: italic; }
+  .dim { color: var(--text-dim); }
+  .faint { color: var(--text-faint); }
+
+  /* TOP NAV */
+  .topbar {
+    height: 48px;
+    border-bottom: 0.5px solid var(--line);
+    background: rgba(245,241,232,0.92);
+    backdrop-filter: blur(12px);
+    display: flex; align-items: center;
+    padding: 0 22px;
+    gap: 18px;
+    position: sticky; top: 0; z-index: 50;
+  }
+  .brand {
+    font-family: var(--mono); font-size: 13px; font-weight: 500;
+    letter-spacing: -0.2px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .brand-mark {
+    width: 18px; height: 18px;
+    background: var(--gs);
+    border-radius: 3px;
+    display: flex; align-items: center; justify-content: center;
+    color: var(--bg); font-weight: 600; font-size: 11px;
+  }
+  .pulse {
+    display: inline-block; width: 6px; height: 6px;
+    background: var(--green); border-radius: 50%;
+    box-shadow: 0 0 8px var(--green);
+    animation: pulse 2.4s ease-in-out infinite;
+  }
+  @keyframes pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.4; transform: scale(0.85); } }
+
+  .nav { display: flex; gap: 2px; margin-left: 12px; }
+  .nav-link {
+    padding: 7px 12px;
+    font-family: var(--mono); font-size: 11.5px;
+    color: var(--text-dim);
+    border-radius: 5px;
+    cursor: pointer;
+    background: none; border: none;
+    transition: all 0.15s;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .nav-link:hover { color: var(--text); background: var(--bg-2); }
+  .nav-link.active { color: var(--gs); background: var(--gs-bg); }
+  .nav-link .num {
+    font-size: 10px; padding: 1px 5px;
+    background: rgba(255,255,255,0.06); border-radius: 3px;
+    color: var(--text-faint);
+  }
+  .nav-link.active .num { background: rgba(138,111,29,0.18); color: var(--gs); }
+
+  .topbar-right {
+    margin-left: auto;
+    display: flex; align-items: center; gap: 14px;
+    font-family: var(--mono); font-size: 11px;
+  }
+  .pm-id {
+    display: flex; align-items: center; gap: 8px;
+    padding: 4px 10px 4px 4px;
+    border: 0.5px solid var(--line);
+    border-radius: 20px;
+  }
+  .pm-avatar {
+    width: 22px; height: 22px; border-radius: 50%;
+    background: linear-gradient(135deg, var(--gs), #6b5618);
+    color: #f5f1e8;
+    font-weight: 600; font-size: 9.5px;
+    display: flex; align-items: center; justify-content: center;
+    font-family: var(--mono);
+  }
+  .pm-id .firm { color: var(--gs); }
+  .pm-id .role { color: var(--text-dim); }
+
+  /* PAGE */
+  .page { max-width: 1280px; margin: 0 auto; padding: 24px; }
+  .view { display: none; }
+  .view.active { display: block; animation: fadeIn 0.2s ease; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+
+  /* TYPOGRAPHY */
+  .display {
+    font-family: var(--serif);
+    font-size: 34px; font-weight: 400;
+    letter-spacing: -0.8px; line-height: 1.15;
+    margin-bottom: 8px;
+    color: var(--text);
+  }
+  .eyebrow {
+    font-family: var(--mono); font-size: 10px;
+    color: var(--text-faint);
+    text-transform: uppercase; letter-spacing: 1.5px;
+    margin-bottom: 8px;
+  }
+  .lede {
+    font-family: var(--serif);
+    font-size: 17px; line-height: 1.6;
+    color: var(--text-dim);
+    max-width: 720px;
+  }
+
+  /* CARDS */
+  .card {
+    background: var(--bg-1);
+    border: 0.5px solid var(--line);
+    border-radius: 10px;
+    overflow: hidden;
+  }
+  .card-header {
+    padding: 12px 16px;
+    border-bottom: 0.5px solid var(--line);
+    display: flex; justify-content: space-between; align-items: baseline;
+  }
+  .card-title {
+    font-family: var(--mono); font-size: 11.5px; font-weight: 500;
+    color: var(--text);
+    text-transform: uppercase; letter-spacing: 1px;
+  }
+  .card-action {
+    font-family: var(--mono); font-size: 11px;
+    color: var(--accent); cursor: pointer;
+    transition: color 0.15s;
+  }
+  .card-action:hover { color: #8c3f25; }
+
+  /* BUTTONS */
+  .btn {
+    font-family: var(--mono); font-size: 11px;
+    padding: 7px 14px;
+    border-radius: 6px;
+    background: var(--bg-2);
+    border: 0.5px solid var(--line);
+    color: var(--text);
+    transition: all 0.15s;
+  }
+  .btn:hover { border-color: var(--line-2); }
+  .btn.primary {
+    background: var(--gs); border-color: var(--gs); color: var(--bg);
+    font-weight: 500;
+  }
+  .btn.primary:hover { background: #a8841f; }
+  .btn.ghost { background: transparent; }
+
+  /* PILLS */
+  .pill {
+    display: inline-flex; align-items: center; gap: 4px;
+    font-family: var(--mono); font-size: 9.5px;
+    padding: 2px 7px;
+    border-radius: 3px;
+    border: 0.5px solid;
+    text-transform: uppercase; letter-spacing: 0.5px;
+  }
+  .pill.gs { color: var(--gs); border-color: var(--gs); background: var(--gs-bg); }
+  .pill.crit { color: var(--red); border-color: var(--red); background: var(--red-bg); }
+  .pill.warn { color: var(--amber); border-color: var(--amber); background: var(--amber-bg); }
+  .pill.ok { color: var(--green); border-color: var(--green); background: var(--green-bg); }
+  .pill.neutral { color: var(--text-faint); border-color: var(--line); }
+
+  /* === MORNING BRIEFING === */
+  .brief-hero {
+    margin-bottom: 28px;
+    padding-bottom: 22px;
+    border-bottom: 0.5px solid var(--line);
+    display: flex; justify-content: space-between; align-items: flex-end;
+  }
+  .brief-time {
+    font-family: var(--mono); font-size: 11px;
+    color: var(--text-faint);
+    margin-bottom: 6px;
+  }
+  .brief-meta {
+    display: flex; gap: 14px; align-items: center;
+    font-family: var(--mono); font-size: 11px; color: var(--text-dim);
+  }
+
+  .headline {
+    background: linear-gradient(180deg, rgba(189,93,60,0.06), transparent 70%);
+    border: 0.5px solid var(--accent);
+    border-left: 3px solid var(--accent);
+    border-radius: 0 10px 10px 0;
+    padding: 22px 26px;
+    margin-bottom: 24px;
+  }
+  .headline-eyebrow {
+    font-family: var(--mono); font-size: 10px;
+    color: var(--accent);
+    text-transform: uppercase; letter-spacing: 2px;
+    margin-bottom: 12px;
+  }
+  .headline-text {
+    font-family: var(--serif);
+    font-size: 24px; line-height: 1.4;
+    color: var(--text);
+    letter-spacing: -0.4px;
+    font-weight: 400;
+  }
+  .headline-text .ticker {
+    font-family: var(--mono); font-style: normal;
+    color: var(--gs); font-weight: 500;
+  }
+  .headline-text .crit-name {
+    font-style: normal; color: var(--red); font-weight: 500;
+  }
+  .headline-meta {
+    margin-top: 12px;
+    font-family: var(--mono); font-size: 11px;
+    color: var(--text-faint);
+  }
+
+  /* What changed cards */
+  .changed-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 14px;
+    margin-bottom: 24px;
+  }
+  .changed {
+    background: var(--bg-1);
+    border: 0.5px solid var(--line);
+    border-top: 2px solid;
+    border-radius: 0 0 8px 8px;
+    padding: 16px 18px;
+  }
+  .changed.crit { border-top-color: var(--red); }
+  .changed.warn { border-top-color: var(--amber); }
+  .changed.info { border-top-color: var(--accent); }
+  .changed-eyebrow {
+    font-family: var(--mono); font-size: 10px;
+    text-transform: uppercase; letter-spacing: 1.5px;
+    margin-bottom: 8px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .changed.crit .changed-eyebrow { color: var(--red); }
+  .changed.warn .changed-eyebrow { color: var(--amber); }
+  .changed.info .changed-eyebrow { color: var(--accent); }
+  .changed-headline {
+    font-size: 14px; font-weight: 500;
+    color: var(--text);
+    margin-bottom: 8px;
+    line-height: 1.4;
+  }
+  .changed-body {
+    font-family: var(--serif);
+    font-size: 13px; line-height: 1.6;
+    color: var(--text-dim);
+    margin-bottom: 12px;
+  }
+  .changed-action {
+    font-family: var(--mono); font-size: 10.5px;
+    color: var(--text-faint);
+    padding-top: 10px;
+    border-top: 0.5px solid var(--line);
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .changed-link {
+    color: var(--accent); cursor: pointer;
+  }
+  .changed-link:hover { text-decoration: underline; }
+
+  /* Committee questions */
+  .ic-section {
+    display: grid; grid-template-columns: 2fr 1fr; gap: 16px;
+    margin-bottom: 24px;
+  }
+  .ic-questions {
+    background: var(--bg-1);
+    border: 0.5px solid var(--line);
+    border-radius: 10px;
+    padding: 18px 20px;
+  }
+  .ic-q-title {
+    font-family: var(--mono); font-size: 10.5px;
+    color: var(--text-dim);
+    text-transform: uppercase; letter-spacing: 1.5px;
+    margin-bottom: 12px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .ic-q {
+    padding: 10px 0;
+    border-bottom: 0.5px solid var(--line);
+    display: flex; gap: 12px; align-items: flex-start;
+  }
+  .ic-q:last-child { border-bottom: none; padding-bottom: 0; }
+  .ic-q-num {
+    font-family: var(--mono); font-size: 10px;
+    color: var(--text-faint);
+    margin-top: 2px; min-width: 18px;
+  }
+  .ic-q-text {
+    font-family: var(--serif);
+    font-size: 14px; line-height: 1.55;
+    color: var(--text);
+  }
+  .ic-q-evidence {
+    margin-top: 4px;
+    font-family: var(--mono); font-size: 10.5px;
+    color: var(--text-faint);
+  }
+
+  .peer-rank {
+    background: var(--bg-1);
+    border: 0.5px solid var(--line);
+    border-radius: 10px;
+    padding: 18px 20px;
+  }
+  .rank-row {
+    display: grid; grid-template-columns: auto 1fr auto;
+    gap: 10px; align-items: center;
+    padding: 10px 0;
+    border-bottom: 0.5px solid var(--line);
+  }
+  .rank-row:last-child { border-bottom: none; padding-bottom: 0; }
+  .rank-row:first-child { padding-top: 0; }
+  .rank-label {
+    font-family: var(--mono); font-size: 10px;
+    color: var(--text-dim);
+  }
+  .rank-bar {
+    height: 6px; background: var(--bg-3); border-radius: 3px;
+    position: relative; overflow: visible;
+  }
+  .rank-fill {
+    position: absolute; height: 100%; left: 0; top: 0;
+    background: var(--accent); border-radius: 3px;
+  }
+  .rank-fill.warn { background: var(--amber); }
+  .rank-fill.crit { background: var(--red); }
+  .rank-fill.ok { background: var(--green); }
+  .rank-pin {
+    position: absolute; top: -3px;
+    width: 2px; height: 12px;
+    background: var(--gs);
+    border-radius: 1px;
+    box-shadow: 0 0 0 2px var(--bg-1);
+  }
+  .rank-val {
+    font-family: var(--mono); font-size: 11px;
+    color: var(--gs); font-weight: 500;
+  }
+
+  /* === GENERIC TABLES === */
+  .data-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  .data-table thead { background: var(--bg-2); }
+  .data-table th {
+    font-family: var(--mono); font-size: 10px; font-weight: 500;
+    color: var(--text-faint);
+    text-transform: uppercase; letter-spacing: 1px;
+    text-align: left;
+    padding: 10px 14px;
+    border-bottom: 0.5px solid var(--line);
+    white-space: nowrap;
+  }
+  .data-table th.num { text-align: right; }
+  .data-table td {
+    padding: 11px 14px;
+    border-bottom: 0.5px solid var(--line);
+    vertical-align: middle;
+  }
+  .data-table td.num { text-align: right; font-family: var(--mono); }
+  .data-table tbody tr { cursor: pointer; transition: background 0.1s; }
+  .data-table tbody tr:hover { background: var(--bg-2); }
+  .data-table tbody tr:last-child td { border-bottom: none; }
+  .pos-name { font-weight: 500; }
+  .pos-sub {
+    font-size: 10.5px; color: var(--text-faint);
+    margin-top: 2px; font-family: var(--mono);
+  }
+  .delta.crit { color: var(--red); }
+  .delta.warn { color: var(--amber); }
+  .delta.ok { color: var(--green); }
+  .sev {
+    font-family: var(--mono); font-size: 11px; font-weight: 600;
+    text-align: center;
+    padding: 4px 8px;
+    border-radius: 4px;
+    min-width: 36px; display: inline-block;
+  }
+  .sev.crit { color: var(--red); background: var(--red-bg); }
+  .sev.warn { color: var(--amber); background: var(--amber-bg); }
+  .sev.low { color: var(--green); background: var(--green-bg); }
+
+  /* === BREADCRUMB === */
+  .crumbs {
+    font-family: var(--mono); font-size: 11px;
+    color: var(--text-faint);
+    margin-bottom: 14px;
+  }
+  .crumbs a { color: var(--text-faint); }
+  .crumbs a:hover { color: var(--accent); }
+  .crumbs .sep { margin: 0 6px; color: var(--line-2); }
+
+  /* === POSITION BOOK === */
+  .book-tabs {
+    display: flex; gap: 4px;
+    margin-bottom: 16px;
+    padding: 4px;
+    background: var(--bg-1);
+    border: 0.5px solid var(--line);
+    border-radius: 8px;
+    width: fit-content;
+  }
+  .book-tab {
+    padding: 7px 14px;
+    font-family: var(--mono); font-size: 11px;
+    color: var(--text-dim);
+    background: transparent;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .book-tab:hover { color: var(--text); }
+  .book-tab.active { background: var(--bg-3); color: var(--text); }
+  .book-tab .pill { margin-left: 6px; }
+
+  .book-stats {
+    display: grid; grid-template-columns: repeat(4, 1fr);
+    gap: 12px; margin-bottom: 18px;
+  }
+  .book-stat {
+    background: var(--bg-1);
+    border: 0.5px solid var(--line);
+    border-radius: 8px;
+    padding: 14px 16px;
+  }
+  .book-stat .label {
+    font-family: var(--mono); font-size: 10px;
+    color: var(--text-faint);
+    text-transform: uppercase; letter-spacing: 1px;
+    margin-bottom: 6px;
+  }
+  .book-stat .val {
+    font-family: var(--mono); font-size: 22px; font-weight: 500;
+    line-height: 1.1;
+  }
+  .book-stat .val.crit { color: var(--red); }
+  .book-stat .val.warn { color: var(--amber); }
+  .book-stat .val.ok { color: var(--green); }
+  .book-stat .delta {
+    font-size: 11px; color: var(--text-faint);
+    margin-top: 4px;
+    font-family: var(--mono);
+  }
+
+  /* === BORROWER X-RAY === */
+  .xray-hero {
+    background: linear-gradient(180deg, rgba(189,93,60,0.06), transparent 60%);
+    border: 0.5px solid var(--line);
+    border-left: 3px solid var(--accent);
+    border-radius: 0 10px 10px 0;
+    padding: 20px 24px;
+    margin-bottom: 20px;
+  }
+  .xray-name { font-size: 22px; font-weight: 500; letter-spacing: -0.3px; margin-bottom: 6px; }
+  .xray-tags { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
+  .xray-summary {
+    font-family: var(--serif);
+    font-size: 14.5px; line-height: 1.6;
+    color: var(--text-dim); max-width: 760px;
+  }
+  .xray-summary .gs-mark { color: var(--gs); font-style: normal; font-weight: 500; }
+  .xray-summary .crit-mark { color: var(--red); font-style: normal; font-weight: 500; }
+
+  .xray-grid { display: grid; grid-template-columns: 1fr 320px; gap: 16px; }
+
+  .legend-row {
+    display: flex; gap: 16px; flex-wrap: wrap;
+    font-family: var(--mono); font-size: 10.5px;
+    color: var(--text-dim);
+    margin-top: 8px;
+  }
+  .legend-dot {
+    display: inline-block;
+    width: 10px; height: 2px;
+    margin-right: 5px; vertical-align: middle;
+  }
+
+  /* === PEER TELEMETRY === */
+  .peer-cards { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; margin-bottom: 18px; }
+  .peer-card {
+    background: var(--bg-1);
+    border: 0.5px solid var(--line);
+    border-radius: 10px;
+    padding: 18px 20px;
+  }
+  .peer-card-title {
+    font-family: var(--mono); font-size: 11px;
+    color: var(--text-dim);
+    text-transform: uppercase; letter-spacing: 1.5px;
+    margin-bottom: 4px;
+  }
+  .peer-card-sub {
+    font-family: var(--serif);
+    font-size: 13px; color: var(--text-dim);
+    margin-bottom: 16px;
+  }
+  .peer-row {
+    display: grid; grid-template-columns: 50px 1fr 60px;
+    gap: 10px; align-items: center;
+    padding: 7px 0;
+    font-size: 12px;
+  }
+  .peer-row.you {
+    background: var(--gs-bg);
+    border-radius: 4px;
+    margin: 0 -8px;
+    padding: 7px 8px;
+  }
+  .peer-ticker {
+    font-family: var(--mono); font-size: 11px;
+    color: var(--text);
+  }
+  .peer-row.you .peer-ticker { color: var(--gs); font-weight: 500; }
+  .peer-bar { height: 6px; background: var(--bg-3); border-radius: 3px; overflow: hidden; }
+  .peer-bar-fill { height: 100%; border-radius: 3px; }
+  .peer-bar-fill.crit { background: var(--red); }
+  .peer-bar-fill.warn { background: var(--amber); }
+  .peer-bar-fill.ok { background: var(--green); }
+  .peer-bar-fill.gs { background: var(--gs); }
+  .peer-val { font-family: var(--mono); font-size: 11px; text-align: right; color: var(--text-dim); }
+  .peer-row.you .peer-val { color: var(--gs); font-weight: 500; }
+
+  .peer-callout {
+    margin-top: 14px;
+    padding-top: 12px;
+    border-top: 0.5px solid var(--line);
+    font-family: var(--serif);
+    font-size: 12.5px; line-height: 1.55;
+    color: var(--text-dim);
+    font-style: italic;
+  }
+
+  /* === MEMO COMPOSER === */
+  .memo-grid { display: grid; grid-template-columns: 1fr 320px; gap: 18px; }
+  .memo-paper {
+    background: #fbf9f1;
+    color: #1f1d18;
+    border-radius: 4px;
+    padding: 36px 40px;
+    font-family: var(--serif);
+    font-size: 14px; line-height: 1.65;
+    min-height: 600px;
+    box-shadow:
+      0 1px 2px rgba(74, 60, 36, 0.04),
+      0 8px 24px rgba(74, 60, 36, 0.08),
+      0 0 0 0.5px rgba(74, 60, 36, 0.1);
+  }
+  .memo-paper h1 {
+    font-family: var(--sans); font-weight: 500;
+    font-size: 19px; letter-spacing: -0.3px;
+    margin-bottom: 4px; color: #0d0c0a;
+    font-style: normal;
+  }
+  .memo-paper .memo-meta {
+    font-family: var(--mono); font-size: 10.5px;
+    color: #6b6859;
+    margin-bottom: 20px;
+    padding-bottom: 14px;
+    border-bottom: 0.5px solid #d8d3c2;
+    font-style: normal;
+  }
+  .memo-paper h2 {
+    font-family: var(--sans); font-weight: 500;
+    font-size: 13px; letter-spacing: 0.5px;
+    text-transform: uppercase;
+    color: #5b5847;
+    margin: 22px 0 10px;
+    font-style: normal;
+  }
+  .memo-paper p { margin-bottom: 12px; color: #2a2620; }
+  .memo-paper .ticker {
+    font-family: var(--mono); font-style: normal;
+    color: #6b5a1d; font-weight: 600; font-size: 12.5px;
+  }
+  .memo-paper ul { margin: 8px 0 12px 18px; }
+  .memo-paper li { margin-bottom: 6px; color: #2a2620; }
+  .memo-paper .citation {
+    font-family: var(--mono); font-style: normal;
+    font-size: 9.5px; color: #8a8474;
+    vertical-align: super;
+  }
+
+  .memo-side .card { margin-bottom: 14px; }
+  .memo-side h4 {
+    font-family: var(--mono); font-size: 10px;
+    color: var(--text-faint);
+    text-transform: uppercase; letter-spacing: 1.5px;
+    padding: 12px 16px;
+    border-bottom: 0.5px solid var(--line);
+    font-weight: 400;
+  }
+  .memo-toggle {
+    display: flex; align-items: center; gap: 10px;
+    padding: 11px 16px;
+    border-bottom: 0.5px solid var(--line);
+    font-size: 12px;
+    cursor: pointer;
+  }
+  .memo-toggle:last-child { border-bottom: none; }
+  .memo-toggle:hover { background: var(--bg-2); }
+  .memo-toggle input[type="checkbox"] {
+    width: 14px; height: 14px;
+    accent-color: var(--gs);
+  }
+  .memo-toggle .label { flex: 1; color: var(--text); }
+  .memo-toggle .sub { font-family: var(--mono); font-size: 10px; color: var(--text-faint); }
+
+  .export-grid {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 8px;
+    padding: 12px 16px;
+  }
+  .export-btn {
+    padding: 10px;
+    background: var(--bg-2);
+    border: 0.5px solid var(--line);
+    border-radius: 6px;
+    color: var(--text);
+    font-family: var(--mono); font-size: 10.5px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .export-btn:hover { border-color: var(--gs); color: var(--gs); }
+
+  /* SHARED CHART */
+  .chart-frame {
+    padding: 18px 20px;
+  }
+  .chart-eyebrow {
+    font-family: var(--mono); font-size: 10px;
+    color: var(--text-faint);
+    text-transform: uppercase; letter-spacing: 1.5px;
+    margin-bottom: 4px;
+  }
+  .chart-title {
+    font-size: 14px; font-weight: 500;
+    margin-bottom: 6px;
+  }
+  .chart-lede {
+    font-family: var(--serif);
+    font-size: 13px; line-height: 1.55;
+    color: var(--text-dim);
+    margin-bottom: 14px;
+    max-width: 680px;
+  }
+
+  /* FOOTER */
+  .footer {
+    margin-top: 28px; padding: 14px 0;
+    border-top: 0.5px solid var(--line);
+    display: flex; justify-content: space-between;
+    font-family: var(--mono); font-size: 10px;
+    color: var(--text-faint);
+  }
+
+  /* === LEADING SIGNALS (news / litigation / management) === */
+  .signals-strip {
+    margin: 24px 0;
+    background: var(--bg-1);
+    border: 0.5px solid var(--line);
+    border-radius: 10px;
+    overflow: hidden;
+  }
+  .signals-head {
+    padding: 14px 18px;
+    border-bottom: 0.5px solid var(--line);
+    display: flex; justify-content: space-between; align-items: baseline;
+  }
+  .signals-head .title {
+    font-family: var(--mono); font-size: 11.5px;
+    color: var(--text); font-weight: 500;
+    text-transform: uppercase; letter-spacing: 1.5px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .signals-head .title .pulse-mini {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--green); display: inline-block;
+    box-shadow: 0 0 6px var(--green);
+    animation: pulse 2.4s ease-in-out infinite;
+  }
+  .signals-head .sub {
+    font-family: var(--serif); font-style: italic;
+    font-size: 12px; color: var(--text-dim);
+  }
+  .signal-row {
+    display: grid; grid-template-columns: 32px 110px 1fr auto;
+    gap: 14px; align-items: flex-start;
+    padding: 14px 18px;
+    border-bottom: 0.5px solid var(--line);
+    cursor: pointer;
+    transition: background 0.1s;
+  }
+  .signal-row:last-child { border-bottom: none; }
+  .signal-row:hover { background: var(--bg-2); }
+  .signal-icon {
+    width: 28px; height: 28px;
+    border-radius: 6px;
+    display: flex; align-items: center; justify-content: center;
+    font-family: var(--mono); font-size: 13px; font-weight: 600;
+    margin-top: 2px;
+  }
+  .signal-icon.litigation { background: var(--red-bg); color: var(--red); border: 0.5px solid var(--red); }
+  .signal-icon.exec { background: var(--amber-bg); color: var(--amber); border: 0.5px solid var(--amber); }
+  .signal-icon.news { background: var(--accent-soft); color: var(--accent); border: 0.5px solid var(--accent); }
+  .signal-icon.market { background: var(--green-bg); color: var(--green); border: 0.5px solid var(--green); }
+  .signal-meta {
+    font-family: var(--mono); font-size: 10.5px;
+  }
+  .signal-meta .date { color: var(--text); display: block; margin-bottom: 2px; }
+  .signal-meta .type { color: var(--text-faint); text-transform: uppercase; letter-spacing: 0.8px; }
+  .signal-body { min-width: 0; }
+  .signal-headline {
+    font-size: 13.5px; font-weight: 500;
+    color: var(--text);
+    line-height: 1.4;
+    margin-bottom: 5px;
+  }
+  .signal-headline .ticker-link {
+    font-family: var(--mono); color: var(--gs); font-weight: 500;
+  }
+  .signal-summary {
+    font-family: var(--serif);
+    font-size: 12.5px; color: var(--text-dim);
+    line-height: 1.55;
+    margin-bottom: 6px;
+  }
+  .signal-source {
+    font-family: var(--mono); font-size: 10px;
+    color: var(--text-faint);
+  }
+  .signal-source a { color: var(--text-faint); }
+  .signal-source a:hover { color: var(--accent); }
+  .signal-impact {
+    text-align: right;
+    min-width: 110px;
+    padding-top: 2px;
+  }
+  .impact-badge {
+    font-family: var(--mono); font-size: 9.5px;
+    padding: 3px 8px; border-radius: 3px;
+    text-transform: uppercase; letter-spacing: 0.8px;
+    display: inline-block;
+    border: 0.5px solid;
+  }
+  .impact-badge.crit { color: var(--red); border-color: var(--red); background: var(--red-bg); }
+  .impact-badge.warn { color: var(--amber); border-color: var(--amber); background: var(--amber-bg); }
+  .impact-badge.info { color: var(--accent); border-color: var(--accent); background: var(--accent-soft); }
+  .impact-badge.ok { color: var(--green); border-color: var(--green); background: var(--green-bg); }
+  .impact-implication {
+    font-family: var(--mono); font-size: 10px;
+    color: var(--text-faint);
+    margin-top: 6px;
+    line-height: 1.4;
+  }
+
+  /* X-ray timeline overlay */
+  .timeline-pin {
+    position: absolute;
+    width: 18px; height: 18px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-family: var(--mono); font-size: 10px; font-weight: 600;
+    cursor: pointer;
+    transition: transform 0.15s;
+    z-index: 5;
+  }
+  .timeline-pin:hover { transform: scale(1.2); }
+  .timeline-pin.litigation { background: var(--red-bg); color: var(--red); border: 1px solid var(--red); }
+  .timeline-pin.exec { background: var(--amber-bg); color: var(--amber); border: 1px solid var(--amber); }
+  .timeline-pin.news { background: var(--accent-soft); color: var(--accent); border: 1px solid var(--accent); }
+  .timeline-pin.market { background: var(--green-bg); color: var(--green); border: 1px solid var(--green); }
+
+  /* Leading indicators panel (right rail) */
+  .lead-panel {
+    background: var(--bg-1);
+    border: 0.5px solid var(--line);
+    border-radius: 10px;
+    overflow: hidden;
+    margin-top: 14px;
+  }
+  .lead-panel-head {
+    padding: 12px 16px;
+    border-bottom: 0.5px solid var(--line);
+    font-family: var(--mono); font-size: 10px;
+    color: var(--text-faint);
+    text-transform: uppercase; letter-spacing: 1.5px;
+    font-weight: 400;
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .lead-panel-head .count {
+    background: var(--bg-3);
+    padding: 1px 7px; border-radius: 3px;
+    color: var(--text);
+  }
+  .lead-item {
+    padding: 12px 16px;
+    border-bottom: 0.5px solid var(--line);
+    cursor: pointer;
+    transition: background 0.1s;
+  }
+  .lead-item:last-child { border-bottom: none; }
+  .lead-item:hover { background: var(--bg-2); }
+  .lead-item-head {
+    display: flex; gap: 8px; align-items: center;
+    margin-bottom: 6px;
+  }
+  .lead-item-icon {
+    width: 22px; height: 22px;
+    border-radius: 4px;
+    display: flex; align-items: center; justify-content: center;
+    font-family: var(--mono); font-size: 11px; font-weight: 600;
+  }
+  .lead-item-icon.litigation { background: var(--red-bg); color: var(--red); }
+  .lead-item-icon.exec { background: var(--amber-bg); color: var(--amber); }
+  .lead-item-icon.news { background: var(--accent-soft); color: var(--accent); }
+  .lead-item-icon.market { background: var(--green-bg); color: var(--green); }
+  .lead-item-date {
+    font-family: var(--mono); font-size: 10px;
+    color: var(--text-faint);
+    margin-left: auto;
+  }
+  .lead-item-title {
+    font-size: 12.5px; font-weight: 500;
+    color: var(--text);
+    line-height: 1.4;
+    margin-bottom: 4px;
+  }
+  .lead-item-body {
+    font-family: var(--serif); font-size: 12px;
+    color: var(--text-dim);
+    line-height: 1.55;
+    margin-bottom: 6px;
+  }
+  .lead-item-source {
+    font-family: var(--mono); font-size: 9.5px;
+    color: var(--text-faint);
+  }
+  .lead-item-source a { color: var(--text-faint); }
+  .lead-item-source a:hover { color: var(--accent); }
+  .lead-divider {
+    padding: 8px 16px;
+    background: var(--bg-2);
+    font-family: var(--mono); font-size: 9.5px;
+    color: var(--text-faint);
+    text-transform: uppercase; letter-spacing: 1px;
+    border-bottom: 0.5px solid var(--line);
+  }
+
+  /* === BACKTEST PANEL (attached to signals) === */
+  .backtest {
+    margin-top: 10px;
+    padding: 10px 12px;
+    background: rgba(189,93,60,0.05);
+    border: 0.5px solid var(--accent-soft);
+    border-left: 2px solid var(--accent);
+    border-radius: 0 6px 6px 0;
+  }
+  .backtest-eyebrow {
+    font-family: var(--mono); font-size: 9.5px;
+    color: var(--accent);
+    text-transform: uppercase; letter-spacing: 1.2px;
+    margin-bottom: 6px;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .backtest-stat {
+    display: flex; align-items: baseline; gap: 8px;
+    margin-bottom: 4px;
+  }
+  .backtest-num {
+    font-family: var(--mono); font-size: 16px; font-weight: 600;
+    color: var(--text);
+  }
+  .backtest-num.crit { color: var(--red); }
+  .backtest-num.warn { color: var(--amber); }
+  .backtest-vs {
+    font-family: var(--mono); font-size: 11px;
+    color: var(--text-faint);
+  }
+  .backtest-lift {
+    font-family: var(--mono); font-size: 10.5px;
+    color: var(--accent);
+    background: var(--accent-soft);
+    padding: 2px 6px; border-radius: 3px;
+    margin-left: 6px;
+  }
+  .backtest-text {
+    font-family: var(--serif); font-size: 12px;
+    line-height: 1.5;
+    color: var(--text-dim);
+    font-style: italic;
+    margin-top: 4px;
+  }
+  .backtest-mini-bar {
+    display: flex; gap: 1px; height: 4px;
+    margin-top: 8px; border-radius: 2px; overflow: hidden;
+  }
+  .backtest-mini-bar .seg {
+    flex: 1; background: var(--bg-3);
+  }
+  .backtest-mini-bar .seg.event { background: var(--amber); }
+  .backtest-mini-bar .seg.markdown { background: var(--red); }
+
+  /* === PATTERNS PAGE === */
+  .patterns-hero {
+    display: flex; gap: 16px;
+    margin-bottom: 22px;
+  }
+  .pattern-stat {
+    flex: 1;
+    background: var(--bg-1);
+    border: 0.5px solid var(--line);
+    border-radius: 10px;
+    padding: 18px 20px;
+  }
+  .pattern-stat-label {
+    font-family: var(--mono); font-size: 10px;
+    color: var(--text-faint);
+    text-transform: uppercase; letter-spacing: 1.2px;
+    margin-bottom: 8px;
+  }
+  .pattern-stat-val {
+    font-family: var(--mono); font-size: 26px;
+    font-weight: 500; line-height: 1;
+    margin-bottom: 4px;
+  }
+  .pattern-stat-val .lift {
+    font-size: 13px; color: var(--green);
+    margin-left: 6px;
+  }
+  .pattern-stat-sub {
+    font-family: var(--serif); font-size: 12px;
+    color: var(--text-dim);
+    line-height: 1.5;
+    margin-top: 6px;
+  }
+
+  .pattern-card {
+    background: var(--bg-1);
+    border: 0.5px solid var(--line);
+    border-radius: 10px;
+    margin-bottom: 14px;
+    overflow: hidden;
+  }
+  .pattern-card.crit { border-left: 3px solid var(--red); }
+  .pattern-card.warn { border-left: 3px solid var(--amber); }
+  .pattern-card.info { border-left: 3px solid var(--accent); }
+
+  .pattern-head {
+    padding: 14px 18px;
+    border-bottom: 0.5px solid var(--line);
+    display: flex; justify-content: space-between; align-items: flex-start;
+  }
+  .pattern-title {
+    font-size: 15px; font-weight: 500;
+    margin-bottom: 4px;
+    letter-spacing: -0.2px;
+  }
+  .pattern-tags {
+    display: flex; gap: 6px; flex-wrap: wrap;
+    margin-top: 4px;
+  }
+  .pattern-meta-right {
+    text-align: right;
+    font-family: var(--mono); font-size: 10.5px;
+    color: var(--text-faint);
+  }
+  .pattern-meta-right .big {
+    font-size: 18px; font-weight: 600;
+    line-height: 1;
+    margin-bottom: 4px;
+  }
+  .pattern-meta-right .big.crit { color: var(--red); }
+  .pattern-meta-right .big.warn { color: var(--amber); }
+
+  .pattern-thesis {
+    padding: 14px 18px;
+    border-bottom: 0.5px solid var(--line);
+    font-family: var(--serif); font-size: 13.5px;
+    line-height: 1.6;
+    color: var(--text-dim);
+    background: var(--bg-2);
+  }
+  .pattern-thesis em { color: var(--text); font-style: normal; font-weight: 500; }
+
+  .pattern-borrowers {
+    padding: 8px 0;
+  }
+  .pattern-borrower-row {
+    display: grid;
+    grid-template-columns: 1fr 70px 70px 90px 90px 60px;
+    gap: 14px; align-items: center;
+    padding: 10px 18px;
+    cursor: pointer;
+    transition: background 0.1s;
+    border-bottom: 0.5px solid var(--line);
+  }
+  .pattern-borrower-row:last-child { border-bottom: none; }
+  .pattern-borrower-row:hover { background: var(--bg-2); }
+  .pb-name { font-weight: 500; font-size: 13px; }
+  .pb-fund { font-family: var(--mono); font-size: 11px; color: var(--gs); }
+  .pb-fund.peer { color: var(--text-dim); }
+  .pb-meta {
+    font-family: var(--mono); font-size: 10px;
+    color: var(--text-faint);
+    margin-top: 2px;
+  }
+  .pb-cell {
+    text-align: center;
+    font-family: var(--mono); font-size: 11px;
+  }
+  .pb-cell.crit { color: var(--red); }
+  .pb-cell.warn { color: var(--amber); }
+  .pb-cell.dim { color: var(--text-faint); }
+  .pb-mini {
+    width: 60px; height: 24px;
+  }
+  .pattern-action-bar {
+    padding: 12px 18px;
+    background: var(--bg-2);
+    display: flex; justify-content: space-between; align-items: center;
+    border-top: 0.5px solid var(--line);
+  }
+  .pattern-action-bar .left {
+    font-family: var(--mono); font-size: 10.5px;
+    color: var(--text-dim);
+  }
+  .pattern-action-bar .right {
+    display: flex; gap: 8px;
+  }
+
+  .patterns-toolbar {
+    display: flex; gap: 8px; align-items: center;
+    margin-bottom: 14px;
+    flex-wrap: wrap;
+  }
+  .pattern-filter {
+    font-family: var(--mono); font-size: 11px;
+    padding: 6px 12px;
+    background: var(--bg-1); border: 0.5px solid var(--line);
+    border-radius: 5px;
+    color: var(--text-dim);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .pattern-filter:hover { color: var(--text); border-color: var(--line-2); }
+  .pattern-filter.active { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
+  .filter-label {
+    font-family: var(--mono); font-size: 9.5px;
+    color: var(--text-faint);
+    text-transform: uppercase; letter-spacing: 1px;
+    margin-right: 4px;
+  }
+
+  /* === COMPOSER === */
+  .composer {
+    background: linear-gradient(180deg, rgba(189,93,60,0.05), transparent 60%);
+    border: 0.5px solid var(--accent-soft);
+    border-left: 2px solid var(--accent);
+    border-radius: 0 12px 12px 0;
+    padding: 22px 24px;
+    margin-bottom: 24px;
+  }
+  .composer-eyebrow {
+    font-family: var(--mono); font-size: 10px;
+    color: var(--accent);
+    text-transform: uppercase; letter-spacing: 1.8px;
+    margin-bottom: 10px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .composer-eyebrow .badge-beta {
+    font-size: 9px; padding: 1px 5px;
+    border: 0.5px solid var(--accent);
+    border-radius: 3px; color: var(--accent);
+  }
+  .composer-input-wrap {
+    display: flex; align-items: center; gap: 10px;
+    background: var(--bg-1);
+    border: 0.5px solid var(--line);
+    border-radius: 10px;
+    padding: 14px 16px;
+    transition: border-color 0.15s, box-shadow 0.15s;
+    margin-bottom: 14px;
+  }
+  .composer-input-wrap:focus-within {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(189,93,60,0.10);
+  }
+  .composer-prompt-icon {
+    font-family: var(--mono);
+    color: var(--accent); font-size: 16px;
+    line-height: 1; flex-shrink: 0;
+  }
+  .composer-input {
+    flex: 1;
+    background: transparent; border: none; outline: none;
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 15px;
+    padding: 2px 0;
+  }
+  .composer-input::placeholder { color: var(--text-faint); }
+  .composer-run-btn {
+    background: var(--accent); border: none;
+    border-radius: 6px;
+    padding: 8px 16px;
+    font-family: var(--mono); font-size: 11px;
+    color: var(--bg); font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .composer-run-btn:hover { background: #9cc4ff; }
+  .composer-run-btn .kbd-mini {
+    font-size: 9px;
+    padding: 1px 4px;
+    background: rgba(0,0,0,0.15);
+    border-radius: 2px;
+  }
+
+  /* Examples / starter queries */
+  .composer-examples {
+    display: flex; gap: 8px; flex-wrap: wrap;
+    margin-bottom: 4px;
+  }
+  .composer-example {
+    font-family: var(--serif); font-style: italic;
+    font-size: 12.5px;
+    padding: 7px 12px;
+    background: var(--bg-1);
+    border: 0.5px solid var(--line);
+    border-radius: 18px;
+    color: var(--text-dim);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .composer-example:hover {
+    color: var(--accent);
+    border-color: var(--accent);
+    background: var(--accent-soft);
+  }
+  .composer-example::before {
+    content: '"';
+    font-family: var(--mono); color: var(--text-faint);
+    margin-right: 2px;
+  }
+  .composer-example::after {
+    content: '"';
+    font-family: var(--mono); color: var(--text-faint);
+    margin-left: 2px;
+  }
+
+  /* Interpretation row — chips that show how the system parsed it */
+  .composer-interpretation {
+    margin-top: 14px;
+    padding: 12px 14px;
+    background: var(--bg-2);
+    border-radius: 8px;
+    border: 0.5px solid var(--line);
+  }
+  .composer-interp-eyebrow {
+    font-family: var(--mono); font-size: 9.5px;
+    color: var(--text-faint);
+    text-transform: uppercase; letter-spacing: 1.2px;
+    margin-bottom: 8px;
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .composer-interp-eyebrow .right {
+    color: var(--text-dim);
+    text-transform: none;
+    letter-spacing: 0;
+    font-family: var(--mono);
+  }
+  .composer-chips {
+    display: flex; gap: 6px; flex-wrap: wrap; align-items: center;
+  }
+  .composer-chip {
+    font-family: var(--mono); font-size: 11px;
+    padding: 5px 10px;
+    border-radius: 5px;
+    background: var(--bg-3);
+    border: 0.5px solid var(--line-2);
+    color: var(--text);
+    cursor: pointer;
+    transition: all 0.15s;
+    display: inline-flex; align-items: center; gap: 6px;
+    line-height: 1.4;
+  }
+  .composer-chip:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+  .composer-chip .chip-key {
+    color: var(--text-faint);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+  }
+  .composer-chip .chip-val {
+    color: var(--text);
+    font-weight: 500;
+  }
+  .composer-chip .chip-edit {
+    font-size: 9px;
+    color: var(--text-faint);
+    margin-left: 2px;
+  }
+  .composer-chip.guess {
+    border-style: dashed;
+    background: var(--amber-bg);
+    border-color: var(--amber);
+  }
+  .composer-chip.guess .chip-val { color: var(--amber); }
+  .composer-chip-add {
+    font-family: var(--mono); font-size: 11px;
+    color: var(--text-faint);
+    background: transparent;
+    border: 0.5px dashed var(--line-2);
+    border-radius: 5px;
+    padding: 5px 10px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .composer-chip-add:hover { color: var(--accent); border-color: var(--accent); }
+
+  .composer-interp-thinking {
+    font-family: var(--serif); font-style: italic;
+    font-size: 12.5px; line-height: 1.55;
+    color: var(--text-dim);
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 0.5px solid var(--line);
+  }
+
+  /* Result preview header */
+  .composer-result-bar {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 10px 14px;
+    margin-top: 14px;
+    background: var(--bg-2);
+    border-radius: 8px;
+    font-family: var(--mono); font-size: 11px;
+  }
+  .composer-result-count {
+    color: var(--text);
+  }
+  .composer-result-count .num {
+    color: var(--accent); font-weight: 600;
+    font-size: 14px;
+    margin-right: 4px;
+  }
+  .composer-result-actions { display: flex; gap: 6px; }
+
+  /* SQL reveal (advanced users) */
+  .composer-sql {
+    margin-top: 10px;
+    padding: 10px 12px;
+    background: #ede5d0;
+    border: 0.5px solid var(--line);
+    border-radius: 6px;
+    font-family: var(--mono); font-size: 10.5px;
+    line-height: 1.55;
+    color: var(--text-dim);
+    overflow-x: auto;
+    white-space: pre;
+  }
+  .composer-sql .kw { color: var(--accent); }
+  .composer-sql .str { color: var(--green); }
+  .composer-sql .num { color: var(--amber); }
+  .composer-sql-toggle {
+    font-family: var(--mono); font-size: 10px;
+    color: var(--text-faint);
+    cursor: pointer;
+    margin-top: 6px;
+  }
+  .composer-sql-toggle:hover { color: var(--accent); }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="brand">
+    <div class="brand-mark">s</div>
+    <span>swarm</span>
+    <span style="color: var(--text-faint);">·</span>
+    <span style="color: var(--text-dim);">credit intelligence</span>
+    <span class="pulse" style="margin-left: 4px;"></span>
+  </div>
+
+  <div class="nav">
+    <button class="nav-link active" data-view="brief"><span>Briefing</span></button>
+    <button class="nav-link" data-view="book"><span>Position book</span><span class="num">752</span></button>
+    <button class="nav-link" data-view="xray"><span>Borrower x-ray</span></button>
+    <button class="nav-link" data-view="peer"><span>Peer telemetry</span></button>
+    <button class="nav-link" data-view="patterns"><span>Patterns</span><span class="num">12</span></button>
+    <button class="nav-link" data-view="memo"><span>Memo composer</span></button>
+  </div>
+
+  <div class="topbar-right">
+    <span class="dim">last sync 06:14 ET</span>
+    <div class="pm-id">
+      <div class="pm-avatar">AS</div>
+      <div>
+        <span class="firm">Goldman Sachs</span>
+        <span class="role"> · GSCR + GSBD</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="page">
+
+<!-- ============ MORNING BRIEFING ============ -->
+<div class="view active" id="view-brief">
+
+  <div class="brief-hero">
+    <div>
+      <div class="brief-time">Monday · May 11 · 07:08 ET</div>
+      <div class="display">Good morning, Ameya.</div>
+      <div class="lede">Here's what changed in your two funds overnight, what to bring to the 9 AM committee, and how Goldman's marks compare to the BDC universe this week.</div>
+    </div>
+    <div class="brief-meta">
+      <span><span style="color: var(--red);">●</span> 3 critical</span>
+      <span><span style="color: var(--amber);">●</span> 9 watch</span>
+      <span><span style="color: var(--green);">●</span> 24 ok</span>
+    </div>
+  </div>
+
+  <div class="headline">
+    <div class="headline-eyebrow">today's headline · auto-generated</div>
+    <div class="headline-text">
+      <span class="ticker">GSCR</span> recorded its highest detector intensity in 30 months last quarter — 22 hits, severity-weighted 8.9, nearly double the prior peak. Three positions drive most of the deterioration: <span class="crit-name">BEP / Buyers Edge</span> (−96.7%), <span class="crit-name">Tecta America</span> (−83.8%), and <span class="crit-name">Medline Borrower</span> (−80.9%). All three remain on accrual. Meanwhile <span class="ticker">GSBD</span> shows a developing pattern in <span class="crit-name">Accommodations Plus</span> (−70.7%) and <span class="crit-name">Fullsteam</span> (−64.1%).
+    </div>
+    <div class="headline-meta">
+      generated from 11 GSCR filings · 13 GSBD filings · 22 + 8 detector hits Q4 ’25 — Q1 ’26
+    </div>
+  </div>
+
+  <div class="changed-grid">
+    <div class="changed crit">
+      <div class="changed-eyebrow">● critical · GSCR</div>
+      <div class="changed-headline">Buyers Edge marked from $46M to $1.5M while still on accrual</div>
+      <div class="changed-body">Severity 97 — the highest single hit in GSCR's history. The 96.7% mark cut happened between Q2 and Q3 ’25 with no public covenant breach disclosed. Position was originated 1Q ’24 at $48.4M.</div>
+      <div class="changed-action">
+        <span>3 quarters since origination</span>
+        <span class="changed-link">open in x-ray →</span>
+      </div>
+    </div>
+    <div class="changed crit">
+      <div class="changed-eyebrow">● critical · GSCR</div>
+      <div class="changed-headline">Three of four non-accrual borrowers are Diversified Consumer Services</div>
+      <div class="changed-body">ABC Plumbing, Specialty Dental Brands, Southeast Mechanical — all home/health services, all sponsor-backed roll-ups. The cluster suggests a sector signal worth flagging to risk before more positions migrate.</div>
+      <div class="changed-action">
+        <span>$62M FV at risk · 0.40% of NAV</span>
+        <span class="changed-link">open sector view →</span>
+      </div>
+    </div>
+    <div class="changed warn">
+      <div class="changed-eyebrow">● watch · GSBD</div>
+      <div class="changed-headline">GSBD non-accrual share is highest in the BDC universe at 3.23%</div>
+      <div class="changed-body">8× the median (~0.4%) and 2× ARCC. The five flagged GSBD names — Accommodations Plus, Fullsteam, Entrust, Cloudbees, Planet DDS — span Software and Commercial Services. Growth-equity vintage is the common thread.</div>
+      <div class="changed-action">
+        <span>18 NA positions · vs 9 GSCR · vs 1 OBDC</span>
+        <span class="changed-link">peer telemetry →</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="signals-strip">
+    <div class="signals-head">
+      <div class="title">
+        <span class="pulse-mini"></span>
+        Forward signals · last 14 days
+      </div>
+      <div class="sub">Leading indicators on your positions — non-mark events the next filing will probably reflect.</div>
+    </div>
+
+    <div class="signal-row" data-view="patterns">
+      <div class="signal-icon" style="background: var(--red-bg); color: var(--red); border: 0.5px solid var(--red);">◆</div>
+      <div class="signal-meta">
+        <span class="date">cluster · live</span>
+        <span class="type">pattern · sector</span>
+      </div>
+      <div class="signal-body">
+        <div class="signal-headline">
+          <strong>Healthcare Providers cluster</strong> — 5 BDC borrowers in physician-practice rollups all flagged severity 85+ in the same 9 months
+        </div>
+        <div class="signal-summary">
+          Veranex, Tebra, CRH, Active Day, Acuity Eyecare — all PE-backed healthcare consolidators. Pattern matches the 2017–2018 dental DSO unwinding. Goldman exposure: <span style="color: var(--gs); font-style: normal; font-weight: 500;">Vardiman Black ($22.4M, GSCR)</span> — currently sev 62, trending toward cluster median of 81.
+        </div>
+        <div class="signal-source">
+          5-borrower cross-pattern · backtest n=23 · refreshes nightly
+        </div>
+        <div class="backtest">
+          <div class="backtest-eyebrow">⊙ when 4+ sector borrowers cluster · backtest n=23</div>
+          <div class="backtest-stat">
+            <span class="backtest-num crit">68%</span>
+            <span class="backtest-vs">of remaining sector borrowers register a severity hit within 4 quarters</span>
+            <span class="backtest-lift">5.1× baseline</span>
+          </div>
+          <div class="backtest-text">
+            Strongest predictive pattern in the system. Sector-cluster signal is more reliable than any single-borrower signal because it captures the macro thesis flowing through the cohort.
+          </div>
+        </div>
+      </div>
+      <div class="signal-impact">
+        <span class="impact-badge crit">credit negative</span>
+        <div class="impact-implication">
+          Vardiman is in this cluster.<br>
+          Expect mark migration toward 80+.
+        </div>
+      </div>
+    </div>
+
+    <div class="signal-row" data-view="xray">
+      <div class="signal-icon litigation">⚖</div>
+      <div class="signal-meta">
+        <span class="date">Nov 25 · 17d ago</span>
+        <span class="type">litigation · EEOC</span>
+      </div>
+      <div class="signal-body">
+        <div class="signal-headline">
+          <span class="ticker-link">GSCR</span> · <strong>Tecta America Corp.</strong> — EEOC files race and sex harassment suit alleging racial slurs by VP and offensive comments to female employees
+        </div>
+        <div class="signal-summary">
+          U.S. District Court for the Northern District of Illinois. Title VII violations alleged at Aurora location. EEOC suits typically resolve via consent decree with monitoring and damages — material litigation reserve likely required in next 10-Q.
+        </div>
+        <div class="signal-source">
+          source: <a href="https://www.eeoc.gov/newsroom/eeoc-sues-anthony-roofing-and-tecta-america-corporation-race-and-sex-harassment" target="_blank">eeoc.gov</a> · enriched at 06:08 ET
+        </div>
+        <div class="backtest">
+          <div class="backtest-eyebrow">⊙ what usually follows · backtest n=144</div>
+          <div class="backtest-stat">
+            <span class="backtest-num crit">25.7%</span>
+            <span class="backtest-vs">of borrower-litigation events were followed by a mark-drift detector hit within 9 months</span>
+            <span class="backtest-lift">3.8× baseline</span>
+          </div>
+          <div class="backtest-text">
+            Baseline rate across all borrower-quarter observations is 6.8%. Lift is highest for litigation events vs management changes (3.2×) and news (3.2×). Severity given a hit averages 23.7 — frequent but moderate cuts.
+          </div>
+        </div>
+      </div>
+      <div class="signal-impact">
+        <span class="impact-badge crit">credit negative</span>
+        <div class="impact-implication">
+          Tecta is already 4Q ’25 mark drift sev 84.<br>
+          This adds a litigation reserve overhang.
+        </div>
+      </div>
+    </div>
+
+    <div class="signal-row" data-view="xray">
+      <div class="signal-icon market">↑</div>
+      <div class="signal-meta">
+        <span class="date">Dec 18 · 30d ago</span>
+        <span class="type">market · ipo signal</span>
+      </div>
+      <div class="signal-body">
+        <div class="signal-headline">
+          <span class="ticker-link">GSCR</span> · <strong>Medline Borrower, LP</strong> — Axios reports private equity owners exploring 2026 IPO
+        </div>
+        <div class="signal-summary">
+          Carlyle, Hellman & Friedman, Blackstone, and GIC reportedly evaluating exit timing. An IPO would refinance the debt stack and likely retire the BDC position at par or premium. Worth tracking against the 4Q ’25 −80.9% mark cut.
+        </div>
+        <div class="signal-source">
+          source: <a href="https://www.axios.com/2025/12/18/medline-ipo-private-equity" target="_blank">axios.com</a>
+        </div>
+        <div class="backtest">
+          <div class="backtest-eyebrow">⊙ what usually follows · backtest n=18</div>
+          <div class="backtest-stat">
+            <span class="backtest-num">61%</span>
+            <span class="backtest-vs">of BDC positions in IPO-rumored borrowers refinance within 4 quarters</span>
+            <span class="backtest-lift" style="background: var(--green-bg); color: var(--green);">par recovery</span>
+          </div>
+          <div class="backtest-text">
+            Limited sample but consistent direction: IPO chatter typically precedes a refinancing or recap that retires BDC debt at par. The recent 80.9% mark cut may have been overly conservative if exit timing materializes.
+          </div>
+        </div>
+      </div>
+      <div class="signal-impact">
+        <span class="impact-badge ok">credit positive</span>
+        <div class="impact-implication">
+          Mark cut may have been<br>
+          conservative — recovery path exists.
+        </div>
+      </div>
+    </div>
+
+    <div class="signal-row" data-view="xray">
+      <div class="signal-icon exec">⌥</div>
+      <div class="signal-meta">
+        <span class="date">Dec 31 · 17d ago</span>
+        <span class="type">management · departure</span>
+      </div>
+      <div class="signal-body">
+        <div class="signal-headline">
+          <span class="ticker-link">GSCR</span> · <strong>Medline Borrower, LP</strong> — Jim Pigott departs as President & COO; Steve Miller promoted to COO, Amanda Laabs to CPO
+        </div>
+        <div class="signal-summary">
+          C-suite reshuffle disclosed via PR newswire. Pigott had been with Medline 18+ years; departure timing coincides with IPO-prep restructuring. Internal promotion of replacements suggests planned succession rather than crisis.
+        </div>
+        <div class="signal-source">
+          source: <a href="https://newsroom.medline.com/releases/medline-announces-leadership-updates/" target="_blank">newsroom.medline.com</a>
+        </div>
+        <div class="backtest">
+          <div class="backtest-eyebrow">⊙ what usually follows · backtest n=405</div>
+          <div class="backtest-stat">
+            <span class="backtest-num warn">21.5%</span>
+            <span class="backtest-vs">of management changes preceded a mark-drift hit within 9 months</span>
+            <span class="backtest-lift">3.2× baseline</span>
+          </div>
+          <div class="backtest-text">
+            But: this is dominated by C-suite departures, not internal promotions. With Pigott's planned retirement and internal succession, this skews toward the "stable transition" cohort historically lower than 21%.
+          </div>
+        </div>
+      </div>
+      <div class="signal-impact">
+        <span class="impact-badge info">neutral / watch</span>
+        <div class="impact-implication">
+          Coincides with IPO chatter —<br>
+          probably benign restructuring.
+        </div>
+      </div>
+    </div>
+
+    <div class="signal-row" data-view="xray">
+      <div class="signal-icon litigation">⚖</div>
+      <div class="signal-meta">
+        <span class="date">May 9 · 1d ago</span>
+        <span class="type">litigation · trade secret</span>
+      </div>
+      <div class="signal-body">
+        <div class="signal-headline">
+          <span class="ticker-link">GSCR</span> <span class="ticker-link">GSBD</span> · <strong>MRI Software LLC</strong> — Files suit against former exec Abhinav Somani and competitor Cadastral, Inc.
+        </div>
+        <div class="signal-summary">
+          U.S. District Court for the District of Delaware, case 1:2026cv00482. Filed yesterday. Likely trade-secret / non-compete action. Litigation against ex-employees + competitors usually signals a defensive product-strategy moment, not financial distress, but adds management distraction.
+        </div>
+        <div class="signal-source">
+          source: <a href="https://dockets.justia.com/docket/delaware/dedce/1:2026cv00482/92943" target="_blank">dockets.justia.com</a>
+        </div>
+      </div>
+      <div class="signal-impact">
+        <span class="impact-badge warn">watch</span>
+        <div class="impact-implication">
+          Not a credit event. Adds<br>
+          to MRI cross-fund spread story.
+        </div>
+      </div>
+    </div>
+
+    <div class="signal-row" data-view="xray">
+      <div class="signal-icon news">★</div>
+      <div class="signal-meta">
+        <span class="date">May 1 · 9d ago</span>
+        <span class="type">news · workforce</span>
+      </div>
+      <div class="signal-body">
+        <div class="signal-headline">
+          <span class="ticker-link">GSCR</span> <span class="ticker-link">GSBD</span> · <strong>MRI Software LLC</strong> — Glassdoor reviews surface multiple layoff rounds, RTO mandate, and management turnover complaints
+        </div>
+        <div class="signal-summary">
+          Reviews cite "lack of business," "poor planning," and "outsourcing" as causes. Tone has worsened across 2024–2025 vs prior years. Coupled with the 4 lawsuits filed since 2023, this is the qualitative backdrop the GBDC mark-down is reflecting.
+        </div>
+        <div class="signal-source">
+          source: <a href="https://www.glassdoor.com" target="_blank">glassdoor.com</a> aggregated
+        </div>
+      </div>
+      <div class="signal-impact">
+        <span class="impact-badge warn">credit negative</span>
+        <div class="impact-implication">
+          Reinforces the case for the<br>
+          model's −50bp implied next mark.
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="ic-section">
+    <div class="ic-questions">
+      <div class="ic-q-title">⌥ what to ask in committee · 4 prepared</div>
+      <div class="ic-q">
+        <div class="ic-q-num">01</div>
+        <div>
+          <div class="ic-q-text">Why is GSCR marking MRI Software at 99.6% of cost when GBDC marks the same security at 98.4% in the same reporting period?</div>
+          <div class="ic-q-evidence">cross-fund spread 1.2pp · ARCC, GBDC, GSBD, GSCR all hold</div>
+        </div>
+      </div>
+      <div class="ic-q">
+        <div class="ic-q-num">02</div>
+        <div>
+          <div class="ic-q-text">Buyers Edge dropped 97% in one quarter with no covenant breach disclosed. What is our internal classification status, and do we have a path to recovery analysis?</div>
+          <div class="ic-q-evidence">GSCR · 3Q ’25 · severity 97 · still on accrual</div>
+        </div>
+      </div>
+      <div class="ic-q">
+        <div class="ic-q-num">03</div>
+        <div>
+          <div class="ic-q-text">Three of GSCR's four non-accrual names are Diversified Consumer Services. Are we structurally overweight this sector, or is the cluster coincidence?</div>
+          <div class="ic-q-evidence">5.0% of NAV · vs 7.2% peer median · 4 borrowers, 9 tranches</div>
+        </div>
+      </div>
+      <div class="ic-q">
+        <div class="ic-q-num">04</div>
+        <div>
+          <div class="ic-q-text">GSBD's 3.23% non-accrual share is 8× the BDC median. Is the credit profile of GSBD's recent originations materially different from GSCR's?</div>
+          <div class="ic-q-evidence">GSBD 18 NA positions vs GSCR 9 vs OBDC 1</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="peer-rank">
+      <div class="card-title" style="margin-bottom: 14px;">peer rank · q1 ’26</div>
+
+      <div class="rank-row">
+        <span class="rank-label">PIK share</span>
+        <div class="rank-bar">
+          <div class="rank-fill warn" style="width: 49%;"></div>
+          <div class="rank-pin" style="left: 49%;"></div>
+        </div>
+        <span class="rank-val">9.98%</span>
+      </div>
+      <div class="rank-row">
+        <span class="rank-label">Non-accrual</span>
+        <div class="rank-bar">
+          <div class="rank-fill ok" style="width: 12%;"></div>
+          <div class="rank-pin" style="left: 12%;"></div>
+        </div>
+        <span class="rank-val">0.40%</span>
+      </div>
+      <div class="rank-row">
+        <span class="rank-label">Hit count</span>
+        <div class="rank-bar">
+          <div class="rank-fill crit" style="width: 78%;"></div>
+          <div class="rank-pin" style="left: 78%;"></div>
+        </div>
+        <span class="rank-val">22 / Q</span>
+      </div>
+      <div class="rank-row">
+        <span class="rank-label">Mark variance</span>
+        <div class="rank-bar">
+          <div class="rank-fill warn" style="width: 60%;"></div>
+          <div class="rank-pin" style="left: 60%;"></div>
+        </div>
+        <span class="rank-val">P60</span>
+      </div>
+
+      <div style="margin-top: 14px; padding-top: 12px; border-top: 0.5px solid var(--line); font-family: var(--mono); font-size: 10px; color: var(--text-faint); line-height: 1.55;">
+        Pin = GSCR percentile across 6 BDCs.<br>
+        Below 50 = better than peers. Above 50 = worse.
+      </div>
+    </div>
+  </div>
+
+  <div style="display: flex; gap: 10px; padding-top: 6px; border-top: 0.5px solid var(--line); margin-top: 24px;">
+    <button class="btn primary" data-view="memo">Compose committee memo →</button>
+    <button class="btn">Send brief to Slack #credit-cmte</button>
+    <button class="btn ghost">Subscribe daily 7 AM</button>
+  </div>
+
+  <div class="footer">
+    <span>generated 06:14 ET · sources: SEC EDGAR · 11 + 13 filings · 762 obs</span>
+    <span>not investment advice</span>
+  </div>
+</div>
+
+<!-- ============ POSITION BOOK ============ -->
+<div class="view" id="view-book">
+
+  <div class="crumbs">
+    <a data-view="brief">briefing</a> <span class="sep">/</span> <span style="color: var(--text);">your position book</span>
+  </div>
+
+  <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 18px;">
+    <div>
+      <div class="eyebrow">your fund · 752 positions · $15.6B FV</div>
+      <div class="display">GSCR position book</div>
+      <div class="lede" style="font-size: 14.5px;">Sorted by deterioration first. Look here when the question is "which of my names is breaking" — not "which are biggest."</div>
+    </div>
+    <div style="display: flex; gap: 8px;">
+      <button class="btn">Switch to GSBD</button>
+      <button class="btn">Filters</button>
+      <button class="btn primary">Export to Excel</button>
+    </div>
+  </div>
+
+  <div class="book-tabs">
+    <button class="book-tab active">Deteriorating <span class="pill crit">22</span></button>
+    <button class="book-tab">Watchlist <span class="pill warn">9</span></button>
+    <button class="book-tab">Non-accrual <span class="pill crit">9</span></button>
+    <button class="book-tab">By vintage</button>
+    <button class="book-tab">By sector</button>
+    <button class="book-tab">By sponsor</button>
+    <button class="book-tab">All 752</button>
+  </div>
+
+  <div class="book-stats">
+    <div class="book-stat">
+      <div class="label">Fair value</div>
+      <div class="val">$15.64B</div>
+      <div class="delta">+34.9% QoQ · 31× since inception</div>
+    </div>
+    <div class="book-stat">
+      <div class="label">PIK share</div>
+      <div class="val warn">9.98%</div>
+      <div class="delta">vs 6.2% peer median · P60</div>
+    </div>
+    <div class="book-stat">
+      <div class="label">Non-accrual</div>
+      <div class="val crit">9 · $62M</div>
+      <div class="delta">3 of 4 borrowers in cons. svcs</div>
+    </div>
+    <div class="book-stat">
+      <div class="label">Q4 hits</div>
+      <div class="val crit">22</div>
+      <div class="delta">+57% QoQ · 30-month high</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <div class="card-title">deteriorating positions · severity ≥ 60 · last 4 quarters</div>
+      <div class="card-action">view all 22 →</div>
+    </div>
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th style="width: 50px;">sev</th>
+          <th>borrower</th>
+          <th>industry</th>
+          <th>vintage</th>
+          <th class="num">prior FV</th>
+          <th class="num">current FV</th>
+          <th class="num">change</th>
+          <th>filing</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr data-view="xray">
+          <td><span class="sev crit">97</span></td>
+          <td>
+            <div class="pos-name">BEP Intermediate Holdco</div>
+            <div class="pos-sub">dba Buyers Edge · still on accrual</div>
+          </td>
+          <td><span class="dim" style="font-size: 11px;">Comm Svcs</span></td>
+          <td><span class="dim mono" style="font-size: 11px;">1Q ’24</span></td>
+          <td class="num">$46.1M</td>
+          <td class="num">$1.5M</td>
+          <td class="num delta crit">−96.7%</td>
+          <td><span class="dim mono" style="font-size: 10.5px;">3Q ’25 · 10-Q</span></td>
+        </tr>
+        <tr>
+          <td><span class="sev crit">90</span></td>
+          <td>
+            <div class="pos-name">First Advantage Holdings</div>
+            <div class="pos-sub">background screening · still on accrual</div>
+          </td>
+          <td><span class="dim" style="font-size: 11px;">Prof Svcs</span></td>
+          <td><span class="dim mono" style="font-size: 11px;">3Q ’24</span></td>
+          <td class="num">$5.2M</td>
+          <td class="num">$0.5M</td>
+          <td class="num delta crit">−89.9%</td>
+          <td><span class="dim mono" style="font-size: 10.5px;">4Q ’24 · 10-K</span></td>
+        </tr>
+        <tr>
+          <td><span class="sev crit">84</span></td>
+          <td>
+            <div class="pos-name">Tecta America Corp.</div>
+            <div class="pos-sub">commercial roofing · still on accrual</div>
+          </td>
+          <td><span class="dim" style="font-size: 11px;">Construction</span></td>
+          <td><span class="dim mono" style="font-size: 11px;">2Q ’25</span></td>
+          <td class="num">$16.7M</td>
+          <td class="num">$2.7M</td>
+          <td class="num delta crit">−83.8%</td>
+          <td><span class="dim mono" style="font-size: 10.5px;">4Q ’25 · 10-K</span></td>
+        </tr>
+        <tr>
+          <td><span class="sev crit">81</span></td>
+          <td>
+            <div class="pos-name">Medline Borrower, LP</div>
+            <div class="pos-sub">medical distribution · still on accrual</div>
+          </td>
+          <td><span class="dim" style="font-size: 11px;">Healthcare</span></td>
+          <td><span class="dim mono" style="font-size: 11px;">3Q ’25</span></td>
+          <td class="num">$26.1M</td>
+          <td class="num">$5.0M</td>
+          <td class="num delta crit">−80.9%</td>
+          <td><span class="dim mono" style="font-size: 10.5px;">4Q ’25 · 10-K</span></td>
+        </tr>
+        <tr>
+          <td><span class="sev warn">78</span></td>
+          <td>
+            <div class="pos-name">Potters Industries</div>
+            <div class="pos-sub">specialty materials · still on accrual</div>
+          </td>
+          <td><span class="dim" style="font-size: 11px;">Chemicals</span></td>
+          <td><span class="dim mono" style="font-size: 11px;">2Q ’25</span></td>
+          <td class="num">$13.4M</td>
+          <td class="num">$2.9M</td>
+          <td class="num delta crit">−78.3%</td>
+          <td><span class="dim mono" style="font-size: 10.5px;">4Q ’25 · 10-K</span></td>
+        </tr>
+        <tr>
+          <td><span class="sev warn">72</span></td>
+          <td>
+            <div class="pos-name">Albaugh, LLC</div>
+            <div class="pos-sub">crop protection</div>
+          </td>
+          <td><span class="dim" style="font-size: 11px;">Chemicals</span></td>
+          <td><span class="dim mono" style="font-size: 11px;">3Q ’23</span></td>
+          <td class="num">$4.6M</td>
+          <td class="num">$1.3M</td>
+          <td class="num delta crit">−72.2%</td>
+          <td><span class="dim mono" style="font-size: 10.5px;">4Q ’23 · 10-K</span></td>
+        </tr>
+        <tr>
+          <td><span class="sev warn">65</span></td>
+          <td>
+            <div class="pos-name">PDDS Holdco</div>
+            <div class="pos-sub">dba Planet DDS · also held by GSBD</div>
+          </td>
+          <td><span class="dim" style="font-size: 11px;">Software</span></td>
+          <td><span class="dim mono" style="font-size: 11px;">2Q ’24</span></td>
+          <td class="num">$139.8M</td>
+          <td class="num">$48.5M</td>
+          <td class="num delta crit">−65.3%</td>
+          <td><span class="dim mono" style="font-size: 10.5px;">4Q ’25 · 10-K</span></td>
+        </tr>
+        <tr>
+          <td><span class="sev warn">64</span></td>
+          <td>
+            <div class="pos-name">MH Sub I, LLC</div>
+            <div class="pos-sub">marketing software</div>
+          </td>
+          <td><span class="dim" style="font-size: 11px;">Software</span></td>
+          <td><span class="dim mono" style="font-size: 11px;">2Q ’25</span></td>
+          <td class="num">$6.8M</td>
+          <td class="num">$2.5M</td>
+          <td class="num delta crit">−64.1%</td>
+          <td><span class="dim mono" style="font-size: 10.5px;">4Q ’25 · 10-K</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="footer">
+    <span>showing 8 of 22 hits ≥ sev 60 · table sortable · all rows link to borrower x-ray</span>
+    <span>cited to filings · SEC EDGAR</span>
+  </div>
+</div>
+
+<!-- ============ BORROWER X-RAY ============ -->
+<div class="view" id="view-xray">
+
+  <div class="crumbs">
+    <a data-view="brief">briefing</a>
+    <span class="sep">/</span>
+    <a data-view="book">position book</a>
+    <span class="sep">/</span>
+    <span style="color: var(--text);">MRI Software LLC</span>
+  </div>
+
+  <div class="xray-hero">
+    <div class="xray-name">MRI Software LLC</div>
+    <div class="xray-tags">
+      <span class="pill gs">★ goldman holds</span>
+      <span class="pill neutral">held by 4 BDCs</span>
+      <span class="pill warn">cross-fund spread 1.2pp</span>
+      <span class="pill neutral">harvest partners · sponsor</span>
+      <span class="pill neutral">real-estate software</span>
+    </div>
+    <div class="xray-summary">
+      Held by <span class="gs-mark">GSCR</span>, <span class="gs-mark">GSBD</span>, GBDC, and ARCC. Latest marks span <span class="gs-mark">98.4% to 99.6%</span> — a 1.2pp spread on a security where peers are increasingly conservative. <span class="crit-mark">GBDC has cut the mark to 98.4%</span> in 1Q ’26 while Goldman holds at 99.2 / 99.6%. If GBDC is the leading indicator, the implied next mark for GSCR/GSBD is roughly 50bp lower.
+    </div>
+  </div>
+
+  <div class="xray-grid">
+
+    <div>
+      <div class="card chart-frame">
+        <div class="chart-eyebrow">cross-fund mark history</div>
+        <div class="chart-title">Mark % of cost · 8 quarters · all 4 holding funds</div>
+        <div class="chart-lede">Each line is one BDC. Where lines diverge, mark variance reveals different credit views on the same security. ARCC's $12K notional position is excluded.</div>
+
+        <svg viewBox="0 0 600 280" style="width: 100%; height: 280px; display: block;" role="img">
+          <title>MRI Software cross-fund mark spread</title>
+          <desc>Four BDC marks plotted across 8 quarters showing divergence in 1Q 2026.</desc>
+
+          <line x1="50" y1="20" x2="50" y2="220" stroke="#d8cfb5" stroke-width="0.5" />
+          <line x1="50" y1="220" x2="580" y2="220" stroke="#d8cfb5" stroke-width="0.5" />
+
+          <line x1="50" y1="80" x2="580" y2="80" stroke="#e7e0cc" stroke-width="0.5" stroke-dasharray="2,3" />
+          <line x1="50" y1="140" x2="580" y2="140" stroke="#e7e0cc" stroke-width="0.5" stroke-dasharray="2,3" />
+          <line x1="50" y1="200" x2="580" y2="200" stroke="#e7e0cc" stroke-width="0.5" stroke-dasharray="2,3" />
+
+          <text x="44" y="24" fill="#948b7c" font-family="JetBrains Mono" font-size="9" text-anchor="end">102%</text>
+          <text x="44" y="84" fill="#948b7c" font-family="JetBrains Mono" font-size="9" text-anchor="end">100%</text>
+          <text x="44" y="144" fill="#948b7c" font-family="JetBrains Mono" font-size="9" text-anchor="end">98%</text>
+          <text x="44" y="204" fill="#948b7c" font-family="JetBrains Mono" font-size="9" text-anchor="end">96%</text>
+
+          <path d="M 90 47 L 150 53 L 210 122 L 270 77 L 330 110 L 390 92 L 450 92 L 510 92 L 570 104"
+                fill="none" stroke="#8a6f1d" stroke-width="2.2" />
+          <circle cx="90" cy="47" r="3" fill="#8a6f1d" />
+          <circle cx="150" cy="53" r="3" fill="#8a6f1d" />
+          <circle cx="210" cy="122" r="3" fill="#8a6f1d" />
+          <circle cx="270" cy="77" r="3" fill="#8a6f1d" />
+          <circle cx="330" cy="110" r="3" fill="#8a6f1d" />
+          <circle cx="390" cy="92" r="3" fill="#8a6f1d" />
+          <circle cx="450" cy="92" r="3" fill="#8a6f1d" />
+          <circle cx="510" cy="92" r="3" fill="#8a6f1d" />
+          <circle cx="570" cy="104" r="4" fill="#8a6f1d" stroke="#f5f1e8" stroke-width="2" />
+
+          <path d="M 510 110 L 570 122"
+                fill="none" stroke="#a8841f" stroke-width="2.2" stroke-dasharray="4,3" />
+          <circle cx="510" cy="110" r="3" fill="#a8841f" />
+          <circle cx="570" cy="122" r="4" fill="#a8841f" stroke="#f5f1e8" stroke-width="2" />
+
+          <path d="M 510 65 L 570 65"
+                fill="none" stroke="#bd5d3c" stroke-width="2.2" />
+          <circle cx="510" cy="65" r="3" fill="#bd5d3c" />
+          <circle cx="570" cy="65" r="3" fill="#bd5d3c" />
+
+          <path d="M 90 80 L 150 80 L 210 80 L 270 80 L 330 80 L 390 80 L 450 80 L 510 80 L 570 80"
+                fill="none" stroke="#4a7c4f" stroke-width="1.5" opacity="0.7" />
+
+          <text x="586" y="68" fill="#bd5d3c" font-family="JetBrains Mono" font-size="10" font-weight="600">GBDC</text>
+          <text x="586" y="96" fill="#8a6f1d" font-family="JetBrains Mono" font-size="10" font-weight="600">GSBD</text>
+          <text x="586" y="125" fill="#a8841f" font-family="JetBrains Mono" font-size="10" font-weight="600">GSCR</text>
+          <text x="586" y="79" fill="#4a7c4f" font-family="JetBrains Mono" font-size="9">ARCC</text>
+
+          <line x1="570" y1="40" x2="570" y2="220" stroke="#a8412a" stroke-width="0.5" stroke-dasharray="3,3" opacity="0.5" />
+          <text x="570" y="36" fill="#a8412a" font-family="JetBrains Mono" font-size="9" text-anchor="middle">spread 1.2pp</text>
+
+          <text x="90" y="240" fill="#948b7c" font-family="JetBrains Mono" font-size="9" text-anchor="middle">1Q ’24</text>
+          <text x="150" y="240" fill="#948b7c" font-family="JetBrains Mono" font-size="9" text-anchor="middle">2Q ’24</text>
+          <text x="210" y="240" fill="#948b7c" font-family="JetBrains Mono" font-size="9" text-anchor="middle">3Q ’24</text>
+          <text x="270" y="240" fill="#948b7c" font-family="JetBrains Mono" font-size="9" text-anchor="middle">4Q ’24</text>
+          <text x="330" y="240" fill="#948b7c" font-family="JetBrains Mono" font-size="9" text-anchor="middle">1Q ’25</text>
+          <text x="390" y="240" fill="#948b7c" font-family="JetBrains Mono" font-size="9" text-anchor="middle">2Q ’25</text>
+          <text x="450" y="240" fill="#948b7c" font-family="JetBrains Mono" font-size="9" text-anchor="middle">3Q ’25</text>
+          <text x="510" y="240" fill="#948b7c" font-family="JetBrains Mono" font-size="9" text-anchor="middle">4Q ’25</text>
+          <text x="570" y="240" fill="#8a6f1d" font-family="JetBrains Mono" font-size="9" text-anchor="middle" font-weight="600">1Q ’26</text>
+
+          <text x="320" y="265" fill="#6b6358" font-family="Source Serif Pro" font-size="11" text-anchor="middle" font-style="italic">
+            GBDC marks down first; spread widens before peers follow
+          </text>
+        </svg>
+
+        <div style="position: relative; margin-top: -38px; height: 38px; pointer-events: none; z-index: 5;">
+          <div class="timeline-pin litigation" style="left: 27%; top: 0; pointer-events: auto;" title="EEOC lawsuit · Aug 2024">⚖</div>
+          <div class="timeline-pin exec" style="left: 76%; top: 0; pointer-events: auto;" title="3 exec appointments · Jan 2025">⌥</div>
+          <div class="timeline-pin news" style="left: 90%; top: 0; pointer-events: auto;" title="Layoff news + Glassdoor · 2025">★</div>
+          <div class="timeline-pin litigation" style="left: 96%; top: 0; pointer-events: auto;" title="Trade secret suit · May 2026">⚖</div>
+        </div>
+
+        <div style="margin-top: 8px; padding: 10px 14px; background: var(--bg-2); border-radius: 6px; font-family: var(--serif); font-size: 12px; line-height: 1.55; color: var(--text-dim); font-style: italic;">
+          Pins above mark non-filing events on the same time axis. The 1Q ’26 trade-secret suit and ongoing layoff narrative precede the GBDC mark cut by weeks — not coincidence, signal sequencing.
+        </div>
+
+        <div class="backtest" style="margin-top: 12px;">
+          <div class="backtest-eyebrow">⊙ reverse backtest · what typically precedes this kind of mark cut</div>
+          <div class="backtest-stat">
+            <span class="backtest-num">41%</span>
+            <span class="backtest-vs">of cross-fund spread events ≥ 1pp were preceded by a litigation event in the prior 6 months</span>
+            <span class="backtest-lift">2.1× baseline</span>
+          </div>
+          <div class="backtest-stat">
+            <span class="backtest-num warn">38%</span>
+            <span class="backtest-vs">of similar spreads were preceded by adverse workforce news (layoffs, RTO disputes)</span>
+            <span class="backtest-lift">2.4× baseline</span>
+          </div>
+          <div class="backtest-mini-bar">
+            <div class="seg event"></div><div class="seg event"></div><div class="seg event"></div><div class="seg event"></div><div class="seg"></div><div class="seg"></div><div class="seg markdown"></div><div class="seg markdown"></div><div class="seg markdown"></div>
+          </div>
+          <div class="backtest-text" style="margin-top: 6px;">
+            On MRI, both signal types are present. The model rates the GBDC-leading-GSCR mark spread as a <em style="color: var(--text); font-style: normal;">high-conviction precursor pattern</em> — implied next mark cut probability 73% within 2 quarters.
+          </div>
+        </div>
+
+        <div class="legend-row">
+          <span><span class="legend-dot" style="background: #d4af37;"></span>GSBD ★</span>
+          <span><span class="legend-dot" style="background: #e0b341; border-bottom: 1px dashed #e0b341; height: 0;"></span>GSCR ★</span>
+          <span><span class="legend-dot" style="background: #6ea8ff;"></span>GBDC</span>
+          <span><span class="legend-dot" style="background: #4ec9a0;"></span>ARCC ($12K notional)</span>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top: 14px;">
+        <div class="card-header">
+          <div class="card-title">latest marks · 1Q 2026</div>
+          <div class="card-action">methodology →</div>
+        </div>
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>fund</th>
+              <th class="num">FV</th>
+              <th class="num">cost</th>
+              <th class="num">mark % cost</th>
+              <th>vs peer median</th>
+              <th>accrual</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr style="background: var(--gs-bg);">
+              <td><span class="mono" style="color: var(--gs); font-weight: 500;">GSCR ★</span></td>
+              <td class="num">$38.0M</td>
+              <td class="num">$38.1M</td>
+              <td class="num"><span style="color: var(--gs);">99.6%</span></td>
+              <td><span class="pill warn">+0.6pp above</span></td>
+              <td><span class="pill ok">accrual</span></td>
+            </tr>
+            <tr style="background: var(--gs-bg);">
+              <td><span class="mono" style="color: var(--gs); font-weight: 500;">GSBD ★</span></td>
+              <td class="num">$34.3M</td>
+              <td class="num">$34.6M</td>
+              <td class="num"><span style="color: var(--gs);">99.2%</span></td>
+              <td><span class="pill warn">+0.2pp above</span></td>
+              <td><span class="pill ok">accrual</span></td>
+            </tr>
+            <tr>
+              <td class="mono">GBDC</td>
+              <td class="num">$55.2M</td>
+              <td class="num">$56.1M</td>
+              <td class="num">98.4%</td>
+              <td><span class="pill crit">−0.6pp below</span></td>
+              <td><span class="pill ok">accrual</span></td>
+            </tr>
+            <tr>
+              <td class="mono">ARCC</td>
+              <td class="num">$0.01M</td>
+              <td class="num">$0.01M</td>
+              <td class="num">99.1%</td>
+              <td><span class="pill neutral">at median</span></td>
+              <td><span class="pill ok">accrual</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div>
+      <div class="card">
+        <h4 style="font-family: var(--mono); font-size: 10px; color: var(--text-faint); text-transform: uppercase; letter-spacing: 1.5px; padding: 14px 16px; border-bottom: 0.5px solid var(--line); font-weight: 400;">
+          implied next mark
+        </h4>
+        <div style="padding: 18px 16px;">
+          <div style="font-family: var(--serif); font-size: 13px; line-height: 1.6; color: var(--text-dim); margin-bottom: 12px;">
+            If GBDC is the leading indicator (it has been first to mark down in 4 of last 6 cross-fund moves on this security), the model expects:
+          </div>
+          <div style="font-family: var(--mono); font-size: 13px;">
+            <div style="display: flex; justify-content: space-between; padding: 7px 0; border-bottom: 0.5px solid var(--line);">
+              <span class="dim">GSCR next</span>
+              <span style="color: var(--amber);">~98.7%</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; padding: 7px 0; border-bottom: 0.5px solid var(--line);">
+              <span class="dim">GSBD next</span>
+              <span style="color: var(--amber);">~98.5%</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; padding: 7px 0;">
+              <span class="dim">Implied loss</span>
+              <span style="color: var(--red);">~$700K combined</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top: 14px;">
+        <h4 style="font-family: var(--mono); font-size: 10px; color: var(--text-faint); text-transform: uppercase; letter-spacing: 1.5px; padding: 14px 16px; border-bottom: 0.5px solid var(--line); font-weight: 400;">
+          sponsor cross-check · harvest partners
+        </h4>
+        <div style="padding: 14px 16px;">
+          <div style="font-family: var(--mono); font-size: 11px; color: var(--text-dim); margin-bottom: 10px;">
+            Other Harvest names held in GSCR / GSBD:
+          </div>
+          <div style="font-family: var(--mono); font-size: 12px;">
+            <div style="display: flex; justify-content: space-between; padding: 5px 0;">
+              <span>Vardiman Black</span>
+              <span style="color: var(--red);">non-accrual</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; padding: 5px 0;">
+              <span>Niagara Bottling</span>
+              <span style="color: var(--green);">+0.3%</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; padding: 5px 0;">
+              <span>Charter Next Gen</span>
+              <span style="color: var(--green);">flat</span>
+            </div>
+          </div>
+          <div style="margin-top: 12px; padding-top: 10px; border-top: 0.5px solid var(--line); font-family: var(--serif); font-size: 12px; line-height: 1.55; color: var(--text-dim); font-style: italic;">
+            Sponsor-level deterioration concentrated in healthcare names; MRI may be the next read-through.
+          </div>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top: 14px;">
+        <h4 style="font-family: var(--mono); font-size: 10px; color: var(--text-faint); text-transform: uppercase; letter-spacing: 1.5px; padding: 14px 16px; border-bottom: 0.5px solid var(--line); font-weight: 400;">
+          actions
+        </h4>
+        <div style="padding: 12px 16px; display: flex; flex-direction: column; gap: 8px;">
+          <button class="btn">⌥ flag for committee</button>
+          <button class="btn">✎ add note to position</button>
+          <button class="btn">↗ open all 4 source filings</button>
+          <button class="btn primary">add to memo</button>
+        </div>
+      </div>
+
+      <div class="lead-panel">
+        <div class="lead-panel-head">
+          <span>leading indicators</span>
+          <span class="count">7</span>
+        </div>
+
+        <div class="lead-divider">litigation · 4 active</div>
+
+        <div class="lead-item">
+          <div class="lead-item-head">
+            <div class="lead-item-icon litigation">⚖</div>
+            <div style="flex: 1;">
+              <div style="font-family: var(--mono); font-size: 10px; color: var(--text-faint);">trade secret</div>
+            </div>
+            <span class="lead-item-date">May 9 ’26</span>
+          </div>
+          <div class="lead-item-title">MRI Holdings v. Somani et al.</div>
+          <div class="lead-item-body">
+            MRI sues former exec and competitor Cadastral. Likely non-compete or trade-secret action. Defensive — not a credit event but adds management distraction.
+          </div>
+          <div class="lead-item-source">
+            <a href="https://dockets.justia.com/docket/delaware/dedce/1:2026cv00482/92943" target="_blank">D. Del. · 1:2026cv00482 →</a>
+          </div>
+        </div>
+
+        <div class="lead-item">
+          <div class="lead-item-head">
+            <div class="lead-item-icon litigation">⚖</div>
+            <div style="flex: 1;">
+              <div style="font-family: var(--mono); font-size: 10px; color: var(--text-faint);">contract dispute</div>
+            </div>
+            <span class="lead-item-date">Feb 11 ’24</span>
+          </div>
+          <div class="lead-item-title">MRI Software v. U Minn Foundation</div>
+          <div class="lead-item-body">
+            Breach of contract / unjust enrichment over university housing software. MRI moved to dismiss counterclaims as time-barred. Modest exposure.
+          </div>
+          <div class="lead-item-source">
+            <a href="https://www.govinfo.gov/content/pkg/USCOURTS-ohnd-1_24-cv-00485/pdf/USCOURTS-ohnd-1_24-cv-00485-0.pdf" target="_blank">N.D. Ohio · 1:24-cv-00485 →</a>
+          </div>
+        </div>
+
+        <div class="lead-item">
+          <div class="lead-item-head">
+            <div class="lead-item-icon litigation">⚖</div>
+            <div style="flex: 1;">
+              <div style="font-family: var(--mono); font-size: 10px; color: var(--text-faint);">customer dispute</div>
+            </div>
+            <span class="lead-item-date">Aug ’23</span>
+          </div>
+          <div class="lead-item-title">Neely v. MRI Software, LLC</div>
+          <div class="lead-item-body">
+            Vita Property Management cross-claim. Memorandum opinion issued on motion to dismiss. Routine commercial litigation.
+          </div>
+          <div class="lead-item-source">
+            <a href="https://law.justia.com/cases/federal/district-courts/missouri/moedce/4:2023cv00941/204801/24/" target="_blank">E.D. Mo. · 4:23-cv-00941 →</a>
+          </div>
+        </div>
+
+        <div class="lead-divider">workforce · 1 signal</div>
+
+        <div class="lead-item">
+          <div class="lead-item-head">
+            <div class="lead-item-icon news">★</div>
+            <div style="flex: 1;">
+              <div style="font-family: var(--mono); font-size: 10px; color: var(--text-faint);">layoffs · sentiment</div>
+            </div>
+            <span class="lead-item-date">2025</span>
+          </div>
+          <div class="lead-item-title">Glassdoor: multiple layoff rounds, RTO push</div>
+          <div class="lead-item-body">
+            Reviews cite "lack of business," "poor planning," "outsourcing." Tone deteriorating across 2024–2025. Aggregated qualitative signal — the kind of evidence GBDC's mark-down is reflecting.
+          </div>
+          <div class="lead-item-source">
+            <a href="https://www.glassdoor.com/Reviews/MRI-Software-layoff-Reviews-EI_IE325785.0,12_KH13,19.htm" target="_blank">glassdoor.com →</a>
+          </div>
+        </div>
+
+        <div class="lead-divider">management · 3 changes · 12mo</div>
+
+        <div class="lead-item">
+          <div class="lead-item-head">
+            <div class="lead-item-icon exec">⌥</div>
+            <div style="flex: 1;">
+              <div style="font-family: var(--mono); font-size: 10px; color: var(--text-faint);">CIO appointment</div>
+            </div>
+            <span class="lead-item-date">Jan 28 ’26</span>
+          </div>
+          <div class="lead-item-title">Nihar Malik → Chief Innovation Officer</div>
+          <div class="lead-item-body">
+            New role, external hire. Often signals a board-level pivot to product strategy reset.
+          </div>
+          <div class="lead-item-source">
+            <a href="https://www.prnewswire.com/news-releases/mri-software-appoints-nihar-malik-as-chief-innovation-officer-302671212.html" target="_blank">prnewswire.com →</a>
+          </div>
+        </div>
+
+        <div class="lead-item">
+          <div class="lead-item-head">
+            <div class="lead-item-icon exec">⌥</div>
+            <div style="flex: 1;">
+              <div style="font-family: var(--mono); font-size: 10px; color: var(--text-faint);">CTO promotion</div>
+            </div>
+            <span class="lead-item-date">Jan 16 ’25</span>
+          </div>
+          <div class="lead-item-title">Terry Keller → CTO + Eric Walsh → EVP NA</div>
+          <div class="lead-item-body">
+            Internal promotions. Stable succession; not crisis hire pattern.
+          </div>
+          <div class="lead-item-source">
+            <a href="https://www.mrisoftware.com/news/mri-software-announces-executive-promotions/" target="_blank">mrisoftware.com →</a>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="footer">
+    <span>borrower id: TVJJIFNvZnR3YXJlIExMQw · 21 quarterly observations · 4 detector hits</span>
+    <span>cited to SEC EDGAR · not investment advice</span>
+  </div>
+</div>
+
+<!-- ============ PEER TELEMETRY ============ -->
+<div class="view" id="view-peer">
+
+  <div class="crumbs">
+    <a data-view="brief">briefing</a> <span class="sep">/</span> <span style="color: var(--text);">peer telemetry</span>
+  </div>
+
+  <div style="margin-bottom: 22px;">
+    <div class="eyebrow">cohort · 6 BDCs · q1 2026 latest filings</div>
+    <div class="display">You vs the universe</div>
+    <div class="lede" style="font-size: 14.5px;">Goldman pinned across four credit-quality dimensions. Lower percentile is better. Use this view when LP, IR, or risk asks "are we worse than peers?"</div>
+  </div>
+
+  <div class="peer-cards">
+
+    <div class="peer-card">
+      <div class="peer-card-title">PIK share of fair value</div>
+      <div class="peer-card-sub">Higher means more interest income coming as accruals rather than cash — a credit-stress signal.</div>
+
+      <div class="peer-row">
+        <span class="peer-ticker">ARCC</span>
+        <div class="peer-bar"><div class="peer-bar-fill crit" style="width: 95%;"></div></div>
+        <span class="peer-val">20.4%</span>
+      </div>
+      <div class="peer-row">
+        <span class="peer-ticker">GBDC</span>
+        <div class="peer-bar"><div class="peer-bar-fill crit" style="width: 83%;"></div></div>
+        <span class="peer-val">17.8%</span>
+      </div>
+      <div class="peer-row you">
+        <span class="peer-ticker">GSBD ★</span>
+        <div class="peer-bar"><div class="peer-bar-fill gs" style="width: 78%;"></div></div>
+        <span class="peer-val">16.6%</span>
+      </div>
+      <div class="peer-row you">
+        <span class="peer-ticker">GSCR ★</span>
+        <div class="peer-bar"><div class="peer-bar-fill gs" style="width: 47%;"></div></div>
+        <span class="peer-val">10.0%</span>
+      </div>
+      <div class="peer-row">
+        <span class="peer-ticker">MAIN</span>
+        <div class="peer-bar"><div class="peer-bar-fill warn" style="width: 32%;"></div></div>
+        <span class="peer-val">6.8%</span>
+      </div>
+      <div class="peer-row">
+        <span class="peer-ticker">OBDC</span>
+        <div class="peer-bar"><div class="peer-bar-fill ok" style="width: 8%;"></div></div>
+        <span class="peer-val">1.8%</span>
+      </div>
+
+      <div class="peer-callout">
+        GSCR sits below the cohort median at 10.0%. GSBD at 16.6% is above median but well below ARCC and GBDC. Both are within a defensible range; OBDC's 1.8% is the conservative outlier.
+      </div>
+    </div>
+
+    <div class="peer-card">
+      <div class="peer-card-title">Non-accrual share of FV</div>
+      <div class="peer-card-sub">Positions where interest is no longer being recognized — direct measure of impaired credit.</div>
+
+      <div class="peer-row you">
+        <span class="peer-ticker">GSBD ★</span>
+        <div class="peer-bar"><div class="peer-bar-fill gs" style="width: 95%;"></div></div>
+        <span class="peer-val">3.23%</span>
+      </div>
+      <div class="peer-row">
+        <span class="peer-ticker">ARCC</span>
+        <div class="peer-bar"><div class="peer-bar-fill warn" style="width: 35%;"></div></div>
+        <span class="peer-val">1.16%</span>
+      </div>
+      <div class="peer-row you">
+        <span class="peer-ticker">GSCR ★</span>
+        <div class="peer-bar"><div class="peer-bar-fill gs" style="width: 12%;"></div></div>
+        <span class="peer-val">0.40%</span>
+      </div>
+      <div class="peer-row">
+        <span class="peer-ticker">OBDC</span>
+        <div class="peer-bar"><div class="peer-bar-fill ok" style="width: 10%;"></div></div>
+        <span class="peer-val">0.33%</span>
+      </div>
+      <div class="peer-row">
+        <span class="peer-ticker">GBDC</span>
+        <div class="peer-bar"><div class="peer-bar-fill ok" style="width: 0%;"></div></div>
+        <span class="peer-val">0%</span>
+      </div>
+      <div class="peer-row">
+        <span class="peer-ticker">MAIN</span>
+        <div class="peer-bar"><div class="peer-bar-fill ok" style="width: 0%;"></div></div>
+        <span class="peer-val">0%</span>
+      </div>
+
+      <div class="peer-callout">
+        <span style="color: var(--red); font-style: normal; font-weight: 500;">GSBD's 3.23% NA share is the highest in the cohort by 2.8×.</span> The 18 non-accrual positions are concentrated in growth-equity vintages from 2022-2023. This is the most defensible LP-asked question this quarter.
+      </div>
+    </div>
+
+    <div class="peer-card">
+      <div class="peer-card-title">Detector hits · last 2 quarters</div>
+      <div class="peer-card-sub">Mark-drift, PIK creep, cross-fund divergence — combined signal volume on each fund.</div>
+
+      <div class="peer-row">
+        <span class="peer-ticker">OBDC</span>
+        <div class="peer-bar"><div class="peer-bar-fill crit" style="width: 100%;"></div></div>
+        <span class="peer-val">80</span>
+      </div>
+      <div class="peer-row">
+        <span class="peer-ticker">MAIN</span>
+        <div class="peer-bar"><div class="peer-bar-fill crit" style="width: 79%;"></div></div>
+        <span class="peer-val">63</span>
+      </div>
+      <div class="peer-row">
+        <span class="peer-ticker">GBDC</span>
+        <div class="peer-bar"><div class="peer-bar-fill crit" style="width: 74%;"></div></div>
+        <span class="peer-val">59</span>
+      </div>
+      <div class="peer-row you">
+        <span class="peer-ticker">GSCR ★</span>
+        <div class="peer-bar"><div class="peer-bar-fill gs" style="width: 45%;"></div></div>
+        <span class="peer-val">36</span>
+      </div>
+      <div class="peer-row you">
+        <span class="peer-ticker">GSBD ★</span>
+        <div class="peer-bar"><div class="peer-bar-fill gs" style="width: 38%;"></div></div>
+        <span class="peer-val">30</span>
+      </div>
+      <div class="peer-row">
+        <span class="peer-ticker">ARCC</span>
+        <div class="peer-bar"><div class="peer-bar-fill ok" style="width: 0%;"></div></div>
+        <span class="peer-val">0</span>
+      </div>
+
+      <div class="peer-callout">
+        Both Goldman funds are in the lower half of hit volume — but normalize by position count: GSCR 36 hits / 752 positions = 4.8% hit rate, vs OBDC 80 / 367 = 21.8%. OBDC's higher rate reflects more positions being marked down at all.
+      </div>
+    </div>
+
+    <div class="peer-card">
+      <div class="peer-card-title">Cross-fund mark variance</div>
+      <div class="peer-card-sub">For shared borrowers, how much your marks differ from peer median. High variance = either better insight or stale marks.</div>
+
+      <div class="peer-row">
+        <span class="peer-ticker">ARCC</span>
+        <div class="peer-bar"><div class="peer-bar-fill warn" style="width: 65%;"></div></div>
+        <span class="peer-val">+0.8pp</span>
+      </div>
+      <div class="peer-row you">
+        <span class="peer-ticker">GSCR ★</span>
+        <div class="peer-bar"><div class="peer-bar-fill gs" style="width: 50%;"></div></div>
+        <span class="peer-val">+0.4pp</span>
+      </div>
+      <div class="peer-row you">
+        <span class="peer-ticker">GSBD ★</span>
+        <div class="peer-bar"><div class="peer-bar-fill gs" style="width: 30%;"></div></div>
+        <span class="peer-val">+0.1pp</span>
+      </div>
+      <div class="peer-row">
+        <span class="peer-ticker">OBDC</span>
+        <div class="peer-bar"><div class="peer-bar-fill ok" style="width: 25%;"></div></div>
+        <span class="peer-val">−0.1pp</span>
+      </div>
+      <div class="peer-row">
+        <span class="peer-ticker">MAIN</span>
+        <div class="peer-bar"><div class="peer-bar-fill ok" style="width: 15%;"></div></div>
+        <span class="peer-val">−0.3pp</span>
+      </div>
+      <div class="peer-row">
+        <span class="peer-ticker">GBDC</span>
+        <div class="peer-bar"><div class="peer-bar-fill ok" style="width: 10%;"></div></div>
+        <span class="peer-val">−0.4pp</span>
+      </div>
+
+      <div class="peer-callout">
+        GSCR consistently marks shared securities 0.4pp higher than peers. On MRI Software the gap is 1.2pp. Worth tracking quarter over quarter — sustained positive variance can become a credibility issue with auditors.
+      </div>
+    </div>
+
+  </div>
+
+  <div class="footer">
+    <span>cohort: ARCC · GBDC · GSBD · GSCR · MAIN · OBDC · all latest filings</span>
+    <span>cited to SEC EDGAR · not investment advice</span>
+  </div>
+</div>
+
+<!-- ============ PATTERNS ============ -->
+<div class="view" id="view-patterns">
+
+  <div class="crumbs">
+    <a data-view="brief">briefing</a> <span class="sep">/</span> <span style="color: var(--text);">cross-borrower patterns</span>
+  </div>
+
+  <div style="margin-bottom: 22px;">
+    <div class="eyebrow">12 active clusters · last 9 months · learned from 1,051 detector hits + 632 enrichments</div>
+    <div class="display">Patterns across borrowers</div>
+    <div class="lede" style="font-size: 14.5px;">When the same kind of leading indicator shows up in multiple borrowers from a shared sector, sponsor, or vintage, that's a sector-level signal — not coincidence. Each cluster below is back-tested against historical mark trajectories.</div>
+  </div>
+
+  <div class="composer">
+    <div class="composer-eyebrow">
+      ⌥ define your own pattern <span class="badge-beta">beta</span>
+    </div>
+
+    <div class="composer-input-wrap">
+      <span class="composer-prompt-icon">›</span>
+      <input
+        class="composer-input"
+        id="composer-input"
+        type="text"
+        value="Goldman positions with management changes in the last 6 months where the mark cut more than 30%"
+      />
+      <button class="composer-run-btn" id="composer-run">
+        run <span class="kbd-mini">⌘↵</span>
+      </button>
+    </div>
+
+    <div class="composer-examples">
+      <div class="composer-example" onclick="loadExample(0)">show me Sun Capital portfolio companies with any litigation in the last year</div>
+      <div class="composer-example" onclick="loadExample(1)">GSCR positions originated in 2024 with PIK rate above 5%</div>
+      <div class="composer-example" onclick="loadExample(2)">software borrowers held by 3+ BDCs where Goldman marks above peer median</div>
+      <div class="composer-example" onclick="loadExample(3)">non-accrual borrowers where the sponsor has 2+ other names in our book</div>
+    </div>
+
+    <div class="composer-interpretation">
+      <div class="composer-interp-eyebrow">
+        <span>structured interpretation · click any chip to refine</span>
+        <span class="right">parsed in 380ms · sonnet</span>
+      </div>
+      <div class="composer-chips">
+        <div class="composer-chip" title="Click to change fund filter">
+          <span class="chip-key">fund</span>
+          <span class="chip-val">GSCR + GSBD</span>
+          <span class="chip-edit">▾</span>
+        </div>
+        <div class="composer-chip" title="Click to change event type">
+          <span class="chip-key">event</span>
+          <span class="chip-val">management changes</span>
+          <span class="chip-edit">▾</span>
+        </div>
+        <div class="composer-chip guess" title="Best guess — click to refine">
+          <span class="chip-key">window</span>
+          <span class="chip-val">last 180 days</span>
+          <span class="chip-edit">▾</span>
+        </div>
+        <div class="composer-chip" title="Click to change threshold">
+          <span class="chip-key">mark cut</span>
+          <span class="chip-val">≥ 30%</span>
+          <span class="chip-edit">▾</span>
+        </div>
+        <div class="composer-chip guess" title="Best guess — click to refine">
+          <span class="chip-key">change type</span>
+          <span class="chip-val">all (incl. promotions)</span>
+          <span class="chip-edit">▾</span>
+        </div>
+        <button class="composer-chip-add">+ add filter</button>
+      </div>
+      <div class="composer-interp-thinking">
+        Two best-guess filters (dashed). The window of "last 6 months" was widened to <em style="color: var(--text); font-style: normal;">180 days</em> because mark cuts lag management events; the change-type filter defaulted to <em style="color: var(--text); font-style: normal;">all changes</em> but historically <em style="color: var(--text); font-style: normal;">departures</em> are the stronger signal. Click either chip to tighten.
+      </div>
+    </div>
+
+    <div class="composer-result-bar">
+      <div class="composer-result-count">
+        <span class="num">8</span> borrowers match · <span class="dim">avg severity 67 · $179M FV at risk · backtest lift 4.2× baseline</span>
+      </div>
+      <div class="composer-result-actions">
+        <button class="btn">save as pattern</button>
+        <button class="btn">add to memo</button>
+      </div>
+    </div>
+
+    <div class="composer-sql-toggle" onclick="document.getElementById('composer-sql').style.display = document.getElementById('composer-sql').style.display === 'block' ? 'none' : 'block';">
+      ⌥ show generated SQL
+    </div>
+    <pre class="composer-sql" id="composer-sql" style="display: none;"><span class="kw">select</span> d.portfolio_company_canonical, d.fund_ticker, d.severity_score
+<span class="kw">from</span> detector_hits d
+<span class="kw">join</span> enrichments e <span class="kw">on</span> e.detector_hit_id = d.id
+<span class="kw">where</span> d.fund_ticker <span class="kw">in</span> (<span class="str">'GSCR'</span>, <span class="str">'GSBD'</span>)
+  <span class="kw">and</span> d.severity_score &gt;= <span class="num">0.30</span>
+  <span class="kw">and</span> jsonb_array_length(<span class="kw">coalesce</span>(e.management_changes, <span class="str">'[]'</span>::jsonb)) &gt;= <span class="num">1</span>
+  <span class="kw">and</span> d.current_period_end &gt;= now() - <span class="kw">interval</span> <span class="str">'180 days'</span>
+<span class="kw">order by</span> d.severity_score <span class="kw">desc</span>;</pre>
+  </div>
+
+  <!-- Live-built result card from the composer -->
+  <div class="pattern-card warn" style="border-left-color: var(--accent);">
+    <div class="pattern-head">
+      <div>
+        <div class="pattern-title" style="display: flex; align-items: center; gap: 10px;">
+          <span style="font-family: var(--mono); font-size: 11px; padding: 3px 7px; background: var(--accent-soft); color: var(--accent); border-radius: 4px; letter-spacing: 1px; text-transform: uppercase; font-weight: 500;">your query</span>
+          Goldman positions · management change + mark cut ≥ 30%
+        </div>
+        <div class="dim mono" style="font-size: 11px;">8 borrowers · avg severity 67 · $179M FV · 4.2× baseline</div>
+        <div class="pattern-tags">
+          <span class="pill info">composer result</span>
+          <span class="pill gs">★ all Goldman exposure</span>
+          <span class="pill warn">unsaved</span>
+        </div>
+      </div>
+      <div class="pattern-meta-right">
+        <div class="big warn">67</div>
+        <div>avg severity</div>
+        <div style="margin-top: 8px; color: var(--text-dim);">vs sector median 42</div>
+      </div>
+    </div>
+
+    <div class="pattern-thesis">
+      Eight borrowers across GSCR + GSBD with at least one management change in the trailing 6 months <em>and</em> a mark cut of 30%+ in the same window. The combination is empirically more predictive than either alone — <em>backtest hit rate 28% vs 6.8% baseline</em>. Buyers Edge, Tecta America, and Medline are the most distressed; the cluster surfaces 5 names not yet flagged in any preset pattern.
+    </div>
+
+    <div class="pattern-borrowers">
+      <div class="pattern-borrower-row" style="font-family: var(--mono); font-size: 9.5px; color: var(--text-faint); text-transform: uppercase; letter-spacing: 1px; cursor: default; padding-top: 4px; padding-bottom: 4px; border-bottom: 0.5px solid var(--line); background: var(--bg-2);">
+        <div>borrower</div>
+        <div class="pb-cell">sev</div>
+        <div class="pb-cell">mgmt</div>
+        <div class="pb-cell">latest change</div>
+        <div class="pb-cell">FV change</div>
+        <div></div>
+      </div>
+      <div class="pattern-borrower-row" style="background: rgba(138,111,29,0.05);">
+        <div>
+          <div class="pb-name" style="color: var(--gs);">BEP / Buyers Edge</div>
+          <div class="pb-meta"><span class="pb-fund">GSCR ★</span> · 7 mgmt changes · co-Pres restructure</div>
+        </div>
+        <div class="pb-cell crit">97</div>
+        <div class="pb-cell warn">7</div>
+        <div class="pb-cell dim">Jan ’25</div>
+        <div class="pb-cell crit">−96.7%</div>
+        <div style="text-align: center;"><span class="dim" style="font-size: 14px;">→</span></div>
+      </div>
+      <div class="pattern-borrower-row" style="background: rgba(138,111,29,0.05);">
+        <div>
+          <div class="pb-name" style="color: var(--gs);">Tecta America Corp.</div>
+          <div class="pb-meta"><span class="pb-fund">GSCR ★</span> · 10 mgmt changes · full C-suite refresh</div>
+        </div>
+        <div class="pb-cell crit">84</div>
+        <div class="pb-cell warn">10</div>
+        <div class="pb-cell dim">Jan ’26</div>
+        <div class="pb-cell crit">−83.8%</div>
+        <div style="text-align: center;"><span class="dim" style="font-size: 14px;">→</span></div>
+      </div>
+      <div class="pattern-borrower-row" style="background: rgba(138,111,29,0.05);">
+        <div>
+          <div class="pb-name" style="color: var(--gs);">Medline Borrower, LP</div>
+          <div class="pb-meta"><span class="pb-fund">GSCR ★</span> · COO + CPO replacement</div>
+        </div>
+        <div class="pb-cell crit">81</div>
+        <div class="pb-cell warn">3</div>
+        <div class="pb-cell dim">Dec ’25</div>
+        <div class="pb-cell crit">−80.9%</div>
+        <div style="text-align: center;"><span class="dim" style="font-size: 14px;">→</span></div>
+      </div>
+      <div class="pattern-borrower-row" style="background: rgba(138,111,29,0.05);">
+        <div>
+          <div class="pb-name" style="color: var(--gs);">Kenan Advantage Group</div>
+          <div class="pb-meta"><span class="pb-fund">GSCR ★</span> · CFO departure · liquid bulk transport</div>
+        </div>
+        <div class="pb-cell crit">63</div>
+        <div class="pb-cell warn">4</div>
+        <div class="pb-cell dim">Jun ’26</div>
+        <div class="pb-cell crit">−63.1%</div>
+        <div style="text-align: center;"><span class="dim" style="font-size: 14px;">→</span></div>
+      </div>
+      <div class="pattern-borrower-row" style="background: rgba(138,111,29,0.05);">
+        <div>
+          <div class="pb-name" style="color: var(--gs);">Clover Holdings 2 LLC</div>
+          <div class="pb-meta"><span class="pb-fund">GSCR ★</span> · CEO departure · staffing services</div>
+        </div>
+        <div class="pb-cell warn">60</div>
+        <div class="pb-cell warn">3</div>
+        <div class="pb-cell dim">Apr ’26</div>
+        <div class="pb-cell crit">−59.7%</div>
+        <div style="text-align: center;"><span class="dim" style="font-size: 14px;">→</span></div>
+      </div>
+      <div class="pattern-borrower-row" style="background: rgba(138,111,29,0.05);">
+        <div>
+          <div class="pb-name" style="color: var(--gs);">Veritiv Corporation</div>
+          <div class="pb-meta"><span class="pb-fund">GSCR ★</span> · 2 senior departures · packaging distribution</div>
+        </div>
+        <div class="pb-cell warn">59</div>
+        <div class="pb-cell warn">2</div>
+        <div class="pb-cell dim">Mar ’23</div>
+        <div class="pb-cell crit">−58.8%</div>
+        <div style="text-align: center;"><span class="dim" style="font-size: 14px;">→</span></div>
+      </div>
+      <div class="pattern-borrower-row" style="background: rgba(138,111,29,0.05);">
+        <div>
+          <div class="pb-name" style="color: var(--gs);">DexKo Global Inc.</div>
+          <div class="pb-meta"><span class="pb-fund">GSCR ★</span> · CEO departure · auto components</div>
+        </div>
+        <div class="pb-cell warn">50</div>
+        <div class="pb-cell warn">1</div>
+        <div class="pb-cell dim">May ’21</div>
+        <div class="pb-cell crit">−49.7%</div>
+        <div style="text-align: center;"><span class="dim" style="font-size: 14px;">→</span></div>
+      </div>
+      <div class="pattern-borrower-row" style="background: rgba(138,111,29,0.05);">
+        <div>
+          <div class="pb-name" style="color: var(--gs);">Gainsight, Inc.</div>
+          <div class="pb-meta"><span class="pb-fund">GSBD ★</span> · 6 mgmt changes · CS software</div>
+        </div>
+        <div class="pb-cell warn">50</div>
+        <div class="pb-cell warn">6</div>
+        <div class="pb-cell dim">Aug ’25</div>
+        <div class="pb-cell crit">−49.6%</div>
+        <div style="text-align: center;"><span class="dim" style="font-size: 14px;">→</span></div>
+      </div>
+    </div>
+
+    <div class="pattern-action-bar">
+      <div class="left">5 of 8 borrowers above are <span style="color: var(--accent);">not surfaced in any preset pattern</span> — Kenan, Clover, Veritiv, DexKo, Gainsight</div>
+      <div class="right">
+        <button class="btn">save as alert</button>
+        <button class="btn primary">add to memo</button>
+      </div>
+    </div>
+  </div>
+
+  <div style="margin: 18px 0 14px; display: flex; justify-content: space-between; align-items: center;">
+    <div class="eyebrow" style="margin: 0;">preset patterns · always-on</div>
+    <div class="dim mono" style="font-size: 10.5px;">11 more, refreshed nightly</div>
+  </div>
+
+  <div class="patterns-hero">
+    <div class="pattern-stat">
+      <div class="pattern-stat-label">litigation lift</div>
+      <div class="pattern-stat-val">25.7%<span class="lift">3.8× baseline</span></div>
+      <div class="pattern-stat-sub">borrower-litigation events followed by mark-drift hit within 9 months. Baseline 6.8%.</div>
+    </div>
+    <div class="pattern-stat">
+      <div class="pattern-stat-label">management lift</div>
+      <div class="pattern-stat-val">21.5%<span class="lift">3.2× baseline</span></div>
+      <div class="pattern-stat-sub">management changes followed by mark drift. Strongest signal: C-suite departures vs promotions.</div>
+    </div>
+    <div class="pattern-stat">
+      <div class="pattern-stat-label">news lift</div>
+      <div class="pattern-stat-val">21.6%<span class="lift">3.2× baseline</span></div>
+      <div class="pattern-stat-sub">borrower news mentions (layoffs, restructuring, customer disputes) followed by mark drift.</div>
+    </div>
+    <div class="pattern-stat">
+      <div class="pattern-stat-label">cluster signals</div>
+      <div class="pattern-stat-val" style="color: var(--red);">3</div>
+      <div class="pattern-stat-sub">sector clusters with elevated mark severity across ≥4 borrowers in same window.</div>
+    </div>
+  </div>
+
+  <div class="patterns-toolbar">
+    <span class="filter-label">cluster type</span>
+    <button class="pattern-filter active">All</button>
+    <button class="pattern-filter">Sector</button>
+    <button class="pattern-filter">Sponsor</button>
+    <button class="pattern-filter">Vintage</button>
+    <span class="filter-label" style="margin-left: 12px;">scope</span>
+    <button class="pattern-filter active">Goldman exposure</button>
+    <button class="pattern-filter">All BDCs</button>
+    <span class="filter-label" style="margin-left: 12px;">sort</span>
+    <button class="pattern-filter active">Severity ↓</button>
+    <button class="pattern-filter">Recency ↓</button>
+  </div>
+
+  <!-- HEALTHCARE PROVIDERS CLUSTER -->
+  <div class="pattern-card crit">
+    <div class="pattern-head">
+      <div>
+        <div class="pattern-title">Healthcare Providers · physician practice management roll-ups</div>
+        <div class="dim mono" style="font-size: 11px;">5 borrowers · avg severity 81 · 4 quarters</div>
+        <div class="pattern-tags">
+          <span class="pill crit">credit cluster</span>
+          <span class="pill neutral">sector pattern</span>
+          <span class="pill warn">litigation density</span>
+          <span class="pill gs">★ Goldman exposed via GSCR ($24M)</span>
+        </div>
+      </div>
+      <div class="pattern-meta-right">
+        <div class="big crit">81</div>
+        <div>cluster sev</div>
+        <div style="margin-top: 8px; color: var(--text-dim);">+24 vs sector median</div>
+      </div>
+    </div>
+
+    <div class="pattern-thesis">
+      Five PE-backed physician practice consolidators — <em>Veranex, Tebra, CRH Healthcare, Active Day, Acuity Eyecare</em> — have all flagged severity 85+ marks across 9 months. <em>Four of five carry active litigation</em> (commercial disputes, regulatory). The pattern matches the 2017–2018 dental services rollup unwinding: leverage taken on at peak multiples, multi-site integration costs underestimated, organic growth missed, mark cuts in the 80–95% range over a 2–3 quarter window. <em>Implied next-quarter expected severity for sector borrowers without flags yet: 38–45.</em>
+    </div>
+
+    <div class="pattern-borrowers">
+      <div class="pattern-borrower-row" style="font-family: var(--mono); font-size: 9.5px; color: var(--text-faint); text-transform: uppercase; letter-spacing: 1px; cursor: default; padding-top: 4px; padding-bottom: 4px; border-bottom: 0.5px solid var(--line); background: var(--bg-2);">
+        <div>borrower</div>
+        <div class="pb-cell">sev</div>
+        <div class="pb-cell">litig.</div>
+        <div class="pb-cell">period</div>
+        <div class="pb-cell">FV change</div>
+        <div></div>
+      </div>
+      <div class="pattern-borrower-row">
+        <div>
+          <div class="pb-name">Veranex, Inc.</div>
+          <div class="pb-meta"><span class="pb-fund peer">GBDC</span> · medtech CRO · Sun Capital</div>
+        </div>
+        <div class="pb-cell crit">99</div>
+        <div class="pb-cell warn">1</div>
+        <div class="pb-cell dim">3Q ’25</div>
+        <div class="pb-cell crit">−98%</div>
+        <div style="text-align: center;"><span class="dim" style="font-size: 14px;">→</span></div>
+      </div>
+      <div class="pattern-borrower-row">
+        <div>
+          <div class="pb-name">Tebra Technologies, Inc.</div>
+          <div class="pb-meta"><span class="pb-fund peer">GBDC</span> · practice management SW · Vista</div>
+        </div>
+        <div class="pb-cell crit">99</div>
+        <div class="pb-cell crit">3</div>
+        <div class="pb-cell dim">4Q ’25</div>
+        <div class="pb-cell crit">−93%</div>
+        <div style="text-align: center;"><span class="dim" style="font-size: 14px;">→</span></div>
+      </div>
+      <div class="pattern-borrower-row">
+        <div>
+          <div class="pb-name">CRH Healthcare Purchaser</div>
+          <div class="pb-meta"><span class="pb-fund peer">GBDC</span> · urgent care · Brentwood</div>
+        </div>
+        <div class="pb-cell crit">98</div>
+        <div class="pb-cell warn">1</div>
+        <div class="pb-cell dim">3Q ’25</div>
+        <div class="pb-cell crit">−87%</div>
+        <div style="text-align: center;"><span class="dim" style="font-size: 14px;">→</span></div>
+      </div>
+      <div class="pattern-borrower-row">
+        <div>
+          <div class="pb-name">Active Day, Inc.</div>
+          <div class="pb-meta"><span class="pb-fund peer">GBDC</span> · adult day services · Audax</div>
+        </div>
+        <div class="pb-cell crit">93</div>
+        <div class="pb-cell warn">2</div>
+        <div class="pb-cell dim">1Q ’26</div>
+        <div class="pb-cell crit">−81%</div>
+        <div style="text-align: center;"><span class="dim" style="font-size: 14px;">→</span></div>
+      </div>
+      <div class="pattern-borrower-row">
+        <div>
+          <div class="pb-name">Acuity Eyecare Holdings</div>
+          <div class="pb-meta"><span class="pb-fund peer">GBDC</span> · optometry roll-up · Riata</div>
+        </div>
+        <div class="pb-cell crit">86</div>
+        <div class="pb-cell warn">1</div>
+        <div class="pb-cell dim">1Q ’26</div>
+        <div class="pb-cell crit">−65%</div>
+        <div style="text-align: center;"><span class="dim" style="font-size: 14px;">→</span></div>
+      </div>
+      <div class="pattern-borrower-row" style="background: rgba(138,111,29,0.05);">
+        <div>
+          <div class="pb-name" style="color: var(--gs);">Vardiman Black (Specialty Dental)</div>
+          <div class="pb-meta"><span class="pb-fund">GSCR ★</span> · dental DSO · Harvest Partners · <span style="color: var(--red);">non-accrual</span></div>
+        </div>
+        <div class="pb-cell warn">62</div>
+        <div class="pb-cell dim">0</div>
+        <div class="pb-cell dim">4Q ’25</div>
+        <div class="pb-cell crit">−27%</div>
+        <div style="text-align: center;"><span style="color: var(--gs); font-size: 14px;">★</span></div>
+      </div>
+    </div>
+
+    <div class="pattern-action-bar">
+      <div class="left">Goldman exposure: <span style="color: var(--gs); font-family: var(--mono); font-weight: 500;">Vardiman Black ($22.4M FV, GSCR)</span> — currently severity 62, trending toward sector median of 81</div>
+      <div class="right">
+        <button class="btn">monitor cluster</button>
+        <button class="btn primary">add to memo →</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- DIVERSIFIED CONSUMER SERVICES CLUSTER -->
+  <div class="pattern-card warn">
+    <div class="pattern-head">
+      <div>
+        <div class="pattern-title">Diversified Consumer Services · home/health service roll-ups</div>
+        <div class="dim mono" style="font-size: 11px;">4 borrowers · concentrated in GSCR · all non-accrual</div>
+        <div class="pattern-tags">
+          <span class="pill warn">non-accrual cluster</span>
+          <span class="pill neutral">sector pattern</span>
+          <span class="pill gs">★ Goldman exposed via GSCR ($62M, 9 tranches)</span>
+        </div>
+      </div>
+      <div class="pattern-meta-right">
+        <div class="big warn">3 of 4</div>
+        <div>borrowers in sector</div>
+        <div style="margin-top: 8px; color: var(--text-dim);">on GSCR non-accrual list</div>
+      </div>
+    </div>
+
+    <div class="pattern-thesis">
+      <em>Three of GSCR's four non-accrual borrowers</em> — ABC Plumbing, Specialty Dental Brands, Southeast Mechanical — are sponsor-backed roll-ups in fragmented home or health-services categories. Common pattern: integration challenges across 5–15 acquired locations, leverage taken at 6.5–7× peak, customer concentration risk underestimated. <em>Backtest: across the universe, fragmented-service roll-ups with non-accrual flags have a 41% probability of full write-down within 4 quarters.</em>
+    </div>
+
+    <div class="pattern-borrowers">
+      <div class="pattern-borrower-row" style="font-family: var(--mono); font-size: 9.5px; color: var(--text-faint); text-transform: uppercase; letter-spacing: 1px; cursor: default; padding-top: 4px; padding-bottom: 4px; border-bottom: 0.5px solid var(--line); background: var(--bg-2);">
+        <div>borrower</div>
+        <div class="pb-cell">FV</div>
+        <div class="pb-cell">PIK</div>
+        <div class="pb-cell">accrual</div>
+        <div class="pb-cell">cost basis</div>
+        <div></div>
+      </div>
+      <div class="pattern-borrower-row" style="background: rgba(138,111,29,0.05);">
+        <div>
+          <div class="pb-name" style="color: var(--gs);">ABC Investment Holdco</div>
+          <div class="pb-meta"><span class="pb-fund">GSCR ★</span> · plumbing services · 3 tranches</div>
+        </div>
+        <div class="pb-cell">$30.7M</div>
+        <div class="pb-cell dim">no</div>
+        <div class="pb-cell crit">NA</div>
+        <div class="pb-cell warn">−1.5%</div>
+        <div style="text-align: center;"><span style="color: var(--gs); font-size: 14px;">★</span></div>
+      </div>
+      <div class="pattern-borrower-row" style="background: rgba(138,111,29,0.05);">
+        <div>
+          <div class="pb-name" style="color: var(--gs);">Vardiman Black Holdings</div>
+          <div class="pb-meta"><span class="pb-fund">GSCR ★</span> · dental DSO · 2 tranches</div>
+        </div>
+        <div class="pb-cell">$22.4M</div>
+        <div class="pb-cell warn">7%</div>
+        <div class="pb-cell crit">NA</div>
+        <div class="pb-cell crit">−27.5%</div>
+        <div style="text-align: center;"><span style="color: var(--gs); font-size: 14px;">★</span></div>
+      </div>
+      <div class="pattern-borrower-row" style="background: rgba(138,111,29,0.05);">
+        <div>
+          <div class="pb-name" style="color: var(--gs);">Southeast Mechanical, LLC</div>
+          <div class="pb-meta"><span class="pb-fund">GSCR ★</span> · HVAC services · 4 tranches</div>
+        </div>
+        <div class="pb-cell">$9.3M</div>
+        <div class="pb-cell dim">no</div>
+        <div class="pb-cell crit">NA</div>
+        <div class="pb-cell warn">−0.4%</div>
+        <div style="text-align: center;"><span style="color: var(--gs); font-size: 14px;">★</span></div>
+      </div>
+    </div>
+
+    <div class="pattern-action-bar">
+      <div class="left">3 of 4 GSCR non-accrual borrowers in same sector — most defensible LP-asked question this quarter</div>
+      <div class="right">
+        <button class="btn">monitor cluster</button>
+        <button class="btn primary">add to memo →</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- HARVEST PARTNERS SPONSOR CLUSTER -->
+  <div class="pattern-card info">
+    <div class="pattern-head">
+      <div>
+        <div class="pattern-title">Harvest Partners portfolio · cross-fund deterioration</div>
+        <div class="dim mono" style="font-size: 11px;">3 borrowers · 7 funds across the universe · sponsor signal</div>
+        <div class="pattern-tags">
+          <span class="pill info">sponsor pattern</span>
+          <span class="pill neutral">cross-borrower</span>
+          <span class="pill gs">★ Goldman exposed (GSCR + GSBD)</span>
+        </div>
+      </div>
+      <div class="pattern-meta-right">
+        <div class="big">3</div>
+        <div>Harvest names</div>
+        <div style="margin-top: 8px; color: var(--text-dim);">held by Goldman</div>
+      </div>
+    </div>
+
+    <div class="pattern-thesis">
+      Three Harvest Partners portfolio companies held in GSCR/GSBD: <em>MRI Software</em> (1.2pp cross-fund spread, GBDC marking down first), <em>Vardiman Black</em> (non-accrual, 7% PIK), and <em>Niagara Bottling</em> (stable). The deterioration is concentrated in healthcare and software — reflecting Harvest's late-cycle thesis on those sectors. <em>Vintage matters: all three were originated 2022–2023 at peak multiples.</em>
+    </div>
+
+    <div class="pattern-borrowers">
+      <div class="pattern-borrower-row" style="background: rgba(138,111,29,0.05);">
+        <div>
+          <div class="pb-name" style="color: var(--gs);">MRI Software LLC</div>
+          <div class="pb-meta"><span class="pb-fund">GSCR ★ GSBD ★</span> · also GBDC, ARCC · real-estate SW</div>
+        </div>
+        <div class="pb-cell">$72.3M</div>
+        <div class="pb-cell warn">spread 1.2pp</div>
+        <div class="pb-cell warn">accrual</div>
+        <div class="pb-cell warn">trending down</div>
+        <div style="text-align: center;"><span style="color: var(--gs); font-size: 14px;">★</span></div>
+      </div>
+      <div class="pattern-borrower-row" style="background: rgba(138,111,29,0.05);">
+        <div>
+          <div class="pb-name" style="color: var(--gs);">Vardiman Black</div>
+          <div class="pb-meta"><span class="pb-fund">GSCR ★</span> · dental DSO</div>
+        </div>
+        <div class="pb-cell">$22.4M</div>
+        <div class="pb-cell warn">7%</div>
+        <div class="pb-cell crit">NA</div>
+        <div class="pb-cell crit">−27.5%</div>
+        <div style="text-align: center;"><span style="color: var(--gs); font-size: 14px;">★</span></div>
+      </div>
+      <div class="pattern-borrower-row" style="background: rgba(138,111,29,0.05);">
+        <div>
+          <div class="pb-name" style="color: var(--gs);">Niagara Bottling</div>
+          <div class="pb-meta"><span class="pb-fund">GSBD ★</span> · packaging</div>
+        </div>
+        <div class="pb-cell">$18.2M</div>
+        <div class="pb-cell dim">no</div>
+        <div class="pb-cell ok">accrual</div>
+        <div class="pb-cell ok">+0.3%</div>
+        <div style="text-align: center;"><span style="color: var(--gs); font-size: 14px;">★</span></div>
+      </div>
+    </div>
+
+    <div class="pattern-action-bar">
+      <div class="left">Sponsor concentration risk: $112.9M total Harvest exposure across GSCR + GSBD</div>
+      <div class="right">
+        <button class="btn">view all sponsors</button>
+        <button class="btn primary">add to memo →</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 2024 VINTAGE CLUSTER -->
+  <div class="pattern-card warn">
+    <div class="pattern-head">
+      <div>
+        <div class="pattern-title">2024 origination cohort · early credit deterioration</div>
+        <div class="dim mono" style="font-size: 11px;">Goldman vintage analysis · GSCR + GSBD</div>
+        <div class="pattern-tags">
+          <span class="pill warn">vintage pattern</span>
+          <span class="pill neutral">cross-borrower</span>
+          <span class="pill gs">★ Goldman-only view</span>
+        </div>
+      </div>
+      <div class="pattern-meta-right">
+        <div class="big warn">11.2%</div>
+        <div>cohort hit rate</div>
+        <div style="margin-top: 8px; color: var(--text-dim);">vs 4.8% all-vintage</div>
+      </div>
+    </div>
+
+    <div class="pattern-thesis">
+      Positions originated in calendar 2024 are showing detector hits at <em>2.3× the rate</em> of older vintages in the GSCR book. Buyers Edge (1Q '24, sev 97), First Advantage (3Q '24, sev 90), and Tecta America (2Q '25, sev 84) all originated in this window. <em>Pattern is consistent with late-cycle origination credit losses</em> — base rates were elevated, sponsor competition was high, and underwriting may have stretched.
+    </div>
+
+    <div class="pattern-action-bar">
+      <div class="left">Suggests reviewing 2024 originations as a cohort, not just individually</div>
+      <div class="right">
+        <button class="btn">view 2024 vintage report</button>
+        <button class="btn primary">add to memo →</button>
+      </div>
+    </div>
+  </div>
+
+  <div style="margin-top: 16px; padding: 14px 18px; border: 0.5px dashed var(--line-2); border-radius: 8px; font-family: var(--mono); font-size: 11px; color: var(--text-faint); text-align: center;">
+    8 more clusters detected — Software lawsuits (4 borrowers), Sun Capital portfolio (3 borrowers), Energy services PIK creep (5 borrowers)…
+    <span style="color: var(--accent); cursor: pointer; margin-left: 8px;">show all →</span>
+  </div>
+
+  <div class="footer">
+    <span>patterns refresh nightly · methodology: borrower-quarter event windows + 270-day forward look</span>
+    <span>backtested on 632 enriched detector hits · cited to filings + EDGAR</span>
+  </div>
+</div>
+
+<!-- ============ MEMO COMPOSER ============ -->
+<div class="view" id="view-memo">
+
+  <div class="crumbs">
+    <a data-view="brief">briefing</a> <span class="sep">/</span> <span style="color: var(--text);">memo composer</span>
+  </div>
+
+  <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 18px;">
+    <div>
+      <div class="eyebrow">draft v1 · auto-generated 06:14 · last edited never</div>
+      <div class="display">Weekly credit memo · 9 AM committee</div>
+      <div class="lede" style="font-size: 14.5px;">Drafted from this week's data. Edit inline. The right rail controls what's included; the export bar at bottom ships it.</div>
+    </div>
+    <div style="display: flex; gap: 8px;">
+      <button class="btn">↺ regenerate</button>
+      <button class="btn">+ section</button>
+      <button class="btn primary">finalize & export</button>
+    </div>
+  </div>
+
+  <div class="memo-grid">
+
+    <div class="memo-paper">
+      <h1>Goldman BDC weekly credit memo</h1>
+      <div class="memo-meta">
+        From: Ameya · A. Shanbhag · GSCR/GSBD PM<br>
+        To: Credit Committee · 9 AM Monday May 11 2026<br>
+        Subject: Q4 ’25 detector signals + Q1 ’26 read-through
+      </div>
+
+      <h2>Executive summary</h2>
+      <p>Two distinct stories this week. <span class="ticker">GSCR</span> recorded its highest single-quarter detector intensity in 30 months, driven by three large mark-downs while names remain on accrual. <span class="ticker">GSBD</span> shows the highest non-accrual share of any monitored BDC at 3.23% — 8× the cohort median.</p>
+
+      <h2>1. GSCR · top deteriorations</h2>
+      <p>Three positions account for the bulk of Q4 ’25 severity:</p>
+      <ul>
+        <li><span class="ticker">BEP / Buyers Edge</span> — fair value cut from $46.1M to $1.5M, a 96.7% mark-down between 2Q and 3Q ’25. Position remains on accrual; no covenant breach disclosed in 10-Q.<span class="citation">[1]</span></li>
+        <li><span class="ticker">Tecta America Corp.</span> — fair value $16.7M → $2.7M (−83.8%). Originated 2Q ’25; markdown registered in 4Q ’25 10-K.<span class="citation">[2]</span></li>
+        <li><span class="ticker">Medline Borrower, LP</span> — fair value $26.1M → $5.0M (−80.9%) in 4Q ’25.<span class="citation">[3]</span></li>
+      </ul>
+      <p>All three remain classified as performing. Recommend internal review of Buyers Edge classification given the magnitude of the mark cut.</p>
+
+      <h2>2. Sector signal · diversified consumer services</h2>
+      <p>Three of GSCR's four non-accrual borrowers — ABC Plumbing, Specialty Dental Brands, Southeast Mechanical — are Diversified Consumer Services. The cluster is small ($62M FV, 0.40% of NAV) but structurally similar: sponsor-backed roll-ups in fragmented service industries.<span class="citation">[4]</span></p>
+
+      <h2>3. GSBD · non-accrual leadership</h2>
+      <p><span class="ticker">GSBD</span>'s 3.23% non-accrual share is the highest in the BDC universe (cohort: ARCC, GBDC, MAIN, OBDC). The 18 affected positions skew toward 2022-2023 vintages and growth-equity sponsors. Top NA contributors by FV: Accommodations Plus (−70.7%), Fullsteam (−64.1%), Entrust (−58.3%), Cloudbees (−48.4%), Planet DDS (−45.0%).<span class="citation">[5]</span></p>
+
+      <h2>4. Cross-fund mark spread · MRI Software</h2>
+      <p>Held by all four major BDCs. GBDC has cut to 98.4% in 1Q ’26; GSCR holds at 99.6%, GSBD at 99.2%. If GBDC is the leading indicator (4 of last 6 cross-fund moves on this name), implied next mark for the Goldman positions is roughly 50bp lower.<span class="citation">[6]</span></p>
+
+      <h2>Recommended discussion</h2>
+      <p>Four questions for the committee, in order of priority — see attached single-pager.</p>
+
+      <p style="margin-top: 24px; font-size: 11px; color: #6b6859; padding-top: 12px; border-top: 0.5px solid #d8d3c2;">
+        Sources cited to SEC EDGAR. Data current as of last filing date per security. Prepared with swarm credit intelligence.
+      </p>
+    </div>
+
+    <div class="memo-side">
+
+      <div class="card">
+        <h4>included sections · 5 of 7</h4>
+        <label class="memo-toggle">
+          <input type="checkbox" checked>
+          <div class="label">Executive summary</div>
+        </label>
+        <label class="memo-toggle">
+          <input type="checkbox" checked>
+          <div class="label">GSCR top deteriorations<div class="sub">3 positions · sev ≥ 80</div></div>
+        </label>
+        <label class="memo-toggle">
+          <input type="checkbox" checked>
+          <div class="label">Sector signal · cons. svcs<div class="sub">9 NA tranches</div></div>
+        </label>
+        <label class="memo-toggle">
+          <input type="checkbox" checked>
+          <div class="label">GSBD non-accrual leadership<div class="sub">vs 5-fund cohort</div></div>
+        </label>
+        <label class="memo-toggle">
+          <input type="checkbox" checked>
+          <div class="label">MRI Software cross-fund<div class="sub">leading indicator note</div></div>
+        </label>
+        <label class="memo-toggle">
+          <input type="checkbox">
+          <div class="label">PIK creep · GBDC, ARCC<div class="sub">peer context · optional</div></div>
+        </label>
+        <label class="memo-toggle">
+          <input type="checkbox">
+          <div class="label">GSCR vintage analysis<div class="sub">2024 cohort hit rate</div></div>
+        </label>
+      </div>
+
+      <div class="card">
+        <h4>tone</h4>
+        <div style="padding: 14px 16px; display: flex; gap: 6px; flex-wrap: wrap;">
+          <span class="pill gs">institutional</span>
+          <span class="pill neutral">conservative</span>
+          <span class="pill neutral">technical</span>
+          <span class="pill neutral">brief</span>
+        </div>
+      </div>
+
+      <div class="card">
+        <h4>export</h4>
+        <div class="export-grid">
+          <div class="export-btn">↗ Word .docx</div>
+          <div class="export-btn">↗ PDF</div>
+          <div class="export-btn">↗ Slack thread</div>
+          <div class="export-btn">↗ Email draft</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h4>memory · learning your voice</h4>
+        <div style="padding: 14px 16px; font-family: var(--serif); font-size: 12.5px; line-height: 1.55; color: var(--text-dim); font-style: italic;">
+          After 4 weeks, drafts will mirror your phrasing and section preferences. Currently using institutional default.
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+
+  <div class="footer">
+    <span>memo includes 5 sections · 4 figures available · 6 citations · est read time 4 min</span>
+    <span>cited to SEC EDGAR · prepared for IC use only</span>
+  </div>
+</div>
+
+</div>
+
+<script>
+  const links = document.querySelectorAll('[data-view]');
+  const views = document.querySelectorAll('.view');
+  const navLinks = document.querySelectorAll('.nav-link');
+
+  function showView(name) {
+    navLinks.forEach(t => t.classList.toggle('active', t.dataset.view === name));
+    views.forEach(v => v.classList.toggle('active', v.id === 'view-' + name));
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  links.forEach(el => {
+    el.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      showView(el.dataset.view);
+    });
+  });
+
+  const composerExamples = [
+    "show me Sun Capital portfolio companies with any litigation in the last year",
+    "GSCR positions originated in 2024 with PIK rate above 5%",
+    "software borrowers held by 3+ BDCs where Goldman marks above peer median",
+    "non-accrual borrowers where the sponsor has 2+ other names in our book"
+  ];
+  function loadExample(i) {
+    const input = document.getElementById('composer-input');
+    if (!input) return;
+    input.value = composerExamples[i];
+    input.focus();
+  }
+  window.loadExample = loadExample;
+</script>
+
+</body>
+</html>
