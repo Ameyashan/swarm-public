@@ -1,7 +1,7 @@
 "use server"
 
 import { createClient } from "@/lib/supabase/server"
-import { parsePatternQuery } from "@/lib/patterns/parse"
+import { parsePatternQuery, parsePatternQueryHeuristic } from "@/lib/patterns/parse"
 import {
   validateParsedQuery,
   type PatternFilters,
@@ -29,7 +29,12 @@ export async function parseAction(query: string): Promise<ParseActionResult> {
   if (trimmed.length > 600) {
     return { ok: false, error: "Query too long (max 600 chars)." }
   }
-  const result = await parsePatternQuery(trimmed)
+  // When ANTHROPIC_API_KEY isn't configured, fall back to the deterministic
+  // regex parser. Keeps the composer usable in environments (e.g. the
+  // public Vercel preview) where the key hasn't been provisioned.
+  const result = process.env.ANTHROPIC_API_KEY
+    ? await parsePatternQuery(trimmed)
+    : parsePatternQueryHeuristic(trimmed)
   if (!result.ok) return result
   return { ok: true, query: trimmed, parsed: result.parsed, elapsedMs: result.elapsedMs }
 }

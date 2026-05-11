@@ -69,9 +69,9 @@ export function WhatChangedGrid({ cards }: { cards: ChangedCard[] }) {
                 style={{ borderColor: "var(--line)" }}
               >
                 <span>{card.metaLeft}</span>
-                {!isEmpty ? (
+                {!isEmpty && card.borrower ? (
                   <Link
-                    href={`/borrower/${encodeURIComponent(card.headline.split(" ")[0] ?? "MRI%20Software")}`}
+                    href={`/borrower/${encodeURIComponent(card.borrower)}`}
                     className="text-accent hover:underline"
                   >
                     open x-ray →

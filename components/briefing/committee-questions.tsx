@@ -11,12 +11,21 @@ export function CommitteeQuestions({
       className="rounded-[10px] border px-5 py-[18px]"
       style={{ background: "var(--bg-1)", borderColor: "var(--line)" }}
     >
-      <h2 className="mb-3 flex items-center gap-2 font-mono text-[10.5px] uppercase tracking-[0.16em] text-text-dim">
-        <span className="text-gs" aria-hidden>
-          ⌥
-        </span>
-        what to ask in committee · {questions.length} prepared
-      </h2>
+      <header className="mb-3">
+        <h2 className="flex items-center gap-2 font-mono text-[10.5px] uppercase tracking-[0.16em] text-text-dim">
+          <span className="text-gs" aria-hidden>
+            ⌥
+          </span>
+          committee discussion · {questions.length} evidence-tied prompts
+        </h2>
+        <p
+          className="mt-1 max-w-[680px] font-serif text-[13px] italic leading-[1.55] text-text-dim"
+        >
+          Open questions sourced from the signals above — each one cites the
+          detector hit, fund, and reporting period that prompted it. Walk into
+          the 9 AM with these.
+        </p>
+      </header>
       {questions.length === 0 ? (
         <p className="font-serif italic text-text-dim">
           No evidence-backed questions available — try again after the next
