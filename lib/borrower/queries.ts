@@ -166,18 +166,38 @@ const CUTOFF = "2024-03-31"
 
 async function fetchObservations(name: string): Promise<RawObsRow[]> {
   const supabase = createClient()
-  const { data, error } = await supabase
+  // 1) Exact canonical match (the common case).
+  const exact = await supabase
     .from("observations")
     .select("fund_ticker, period_end, fair_value, cost, is_pik, accrual_status")
     .eq("portfolio_company_canonical", name)
     .gte("period_end", CUTOFF)
     .order("period_end", { ascending: true })
     .limit(10000)
-  if (error) {
-    console.error("borrower fetchObservations err", name, error)
+  if (exact.error) {
+    console.error("borrower fetchObservations err", name, exact.error)
     return []
   }
-  return (data ?? []) as RawObsRow[]
+  if ((exact.data ?? []).length > 0) return exact.data as RawObsRow[]
+
+  // 2) Fuzzy prefix fallback — handles cases where the URL slug is missing
+  //    a corporate suffix (e.g., "MRI Software" → "MRI Software LLC") or
+  //    only the first word of the canonical name was passed.
+  const fuzzy = await supabase
+    .from("observations")
+    .select("fund_ticker, period_end, fair_value, cost, is_pik, accrual_status")
+    .ilike("portfolio_company_canonical", `${name}%`)
+    .gte("period_end", CUTOFF)
+    .order("period_end", { ascending: true })
+    .limit(10000)
+  if (fuzzy.error) {
+    console.error("borrower fetchObservations fuzzy err", name, fuzzy.error)
+    return []
+  }
+  if ((fuzzy.data ?? []).length > 0) {
+    console.warn("borrower fetchObservations · fuzzy match used", name)
+  }
+  return (fuzzy.data ?? []) as RawObsRow[]
 }
 
 function aggregateMarkSeries(rows: RawObsRow[]): {
@@ -197,8 +217,10 @@ function aggregateMarkSeries(rows: RawObsRow[]): {
     const periodMap = map.get(fund)!
     if (!periodMap.has(period)) periodMap.set(period, { fv: 0, cost: 0 })
     const b = periodMap.get(period)!
-    const fv = Number(r.fair_value ?? 0)
-    const cost = Number(r.cost ?? 0)
+    // observations.fair_value / cost are stored in thousands of dollars;
+    // multiply by 1000 here so downstream components show real magnitudes.
+    const fv = Number(r.fair_value ?? 0) * 1000
+    const cost = Number(r.cost ?? 0) * 1000
     if (Number.isFinite(fv)) b.fv += fv
     if (Number.isFinite(cost)) b.cost += cost
   }
@@ -357,20 +379,34 @@ async function fetchBorrowerCanonical(name: string): Promise<{
 
 async function fetchBorrowerHits(name: string, limit = 200): Promise<DetectorHitRow[]> {
   const supabase = createClient()
-  const { data, error } = await supabase
+  const selectCols =
+    "id, detector_name, fund_ticker, portfolio_company_canonical, current_period_end, prior_period_end, severity_score, hit_data, cited_source_urls, created_at"
+  const exact = await supabase
     .from("detector_hits")
-    .select(
-      "id, detector_name, fund_ticker, portfolio_company_canonical, current_period_end, prior_period_end, severity_score, hit_data, cited_source_urls, created_at",
-    )
+    .select(selectCols)
     .eq("portfolio_company_canonical", name)
     .order("current_period_end", { ascending: false, nullsFirst: false })
     .limit(limit)
     .returns<DetectorHitRow[]>()
-  if (error) {
-    console.error("borrower fetchBorrowerHits err", name, error)
+  if (exact.error) {
+    console.error("borrower fetchBorrowerHits err", name, exact.error)
     return []
   }
-  return data ?? []
+  if ((exact.data ?? []).length > 0) return exact.data ?? []
+
+  // Fuzzy fallback — same rationale as fetchObservations.
+  const fuzzy = await supabase
+    .from("detector_hits")
+    .select(selectCols)
+    .ilike("portfolio_company_canonical", `${name}%`)
+    .order("current_period_end", { ascending: false, nullsFirst: false })
+    .limit(limit)
+    .returns<DetectorHitRow[]>()
+  if (fuzzy.error) {
+    console.error("borrower fetchBorrowerHits fuzzy err", name, fuzzy.error)
+    return []
+  }
+  return fuzzy.data ?? []
 }
 
 function deriveSponsorFromHits(hits: DetectorHitRow[]): string | null {

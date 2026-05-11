@@ -138,6 +138,9 @@ export type ChangedCard = {
   metaLeft: string
   detectorName: string
   hitId: string
+  // Canonical borrower name (matches observations.portfolio_company_canonical).
+  // Used to build the "open x-ray →" link without parsing the headline.
+  borrower: string | null
 }
 
 function fmtPct(n: number, digits = 1) {
@@ -232,6 +235,7 @@ export function pickChangedCards(
         metaLeft: "0 hits in bucket",
         detectorName: "—",
         hitId: `empty-${bucket}`,
+        borrower: null,
       })
       continue
     }
@@ -246,6 +250,7 @@ export function pickChangedCards(
       )}`,
       detectorName: top.detector_name,
       hitId: top.id,
+      borrower: top.portfolio_company_canonical,
     })
   }
   return cards

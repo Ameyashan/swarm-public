@@ -139,7 +139,7 @@ const getMriCrossFundLatest = cache(async () => {
   const { data, error } = await supabase
     .from("observations")
     .select("fund_ticker, period_end, fair_value, cost, portfolio_company_canonical")
-    .eq("portfolio_company_canonical", "MRI Software")
+    .eq("portfolio_company_canonical", "MRI Software LLC")
   if (error || !data) {
     return null as null | Array<{
       fund_ticker: string
@@ -267,8 +267,10 @@ function buildGscrDeteriorations(
 
   const lis: MemoInline[][] = top.map((h) => {
     const name = h.portfolio_company_canonical ?? "(unnamed)"
-    const prior = Number(h.hit_data?.fv_prior ?? 0)
-    const curr = Number(h.hit_data?.fv_current ?? 0)
+    // hit_data.fv_prior/fv_current are stored in thousands of dollars —
+    // multiply by 1000 so fmtUsdShort renders real magnitudes ($46.1M, not $46K).
+    const prior = Number(h.hit_data?.fv_prior ?? 0) * 1000
+    const curr = Number(h.hit_data?.fv_current ?? 0) * 1000
     const change = hitFvCutPct(h)
     const accrual = (h.hit_data?.accrual_status as string | undefined) ?? null
     const url =
@@ -337,7 +339,9 @@ async function buildSectorSignal(
       funds: new Set<string>(),
     }
     if (r.portfolio_company_canonical) b.names.add(r.portfolio_company_canonical)
-    if (r.fair_value != null) b.fv += r.fair_value
+    // observations.fair_value is in thousands of dollars — convert here so
+    // fmtUsdShort renders the right magnitude.
+    if (r.fair_value != null) b.fv += r.fair_value * 1000
     if (r.fund_ticker) b.funds.add(r.fund_ticker)
     byIndustry.set(ind, b)
   }

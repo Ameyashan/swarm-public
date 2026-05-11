@@ -1,3 +1,6 @@
+"use client"
+
+import { useMemo, useState } from "react"
 import Link from "next/link"
 import type { BookPositionRow, BookTab } from "@/lib/book/queries"
 
@@ -58,6 +61,106 @@ function groupKey(row: BookPositionRow, tab: BookTab): string {
   return ""
 }
 
+// Sortable columns and their value extractors. Strings sort case-insensitive;
+// numerics treat null/undefined as -Infinity so they sink in descending sorts.
+type SortKey =
+  | "severity"
+  | "borrower"
+  | "industry"
+  | "vintage"
+  | "prior_fv"
+  | "current_fv"
+  | "fv_change_pct"
+  | "accrual"
+type SortDir = "asc" | "desc" | null
+
+function valueFor(row: BookPositionRow, key: SortKey): number | string | null {
+  switch (key) {
+    case "severity":
+      return row.severity_100
+    case "borrower":
+      return (row.borrower ?? "").toLowerCase()
+    case "industry":
+      return (row.industry ?? "").toLowerCase()
+    case "vintage":
+      return row.vintage ?? ""
+    case "prior_fv":
+      return row.prior_fv
+    case "current_fv":
+      return row.current_fv
+    case "fv_change_pct":
+      return row.fv_change_pct
+    case "accrual":
+      // non_accrual sinks before accrual when ascending; treats blank as last.
+      return row.accrual_status ?? "~"
+  }
+}
+
+function compareRows(
+  a: BookPositionRow,
+  b: BookPositionRow,
+  key: SortKey,
+  dir: SortDir,
+): number {
+  if (!dir) return 0
+  const va = valueFor(a, key)
+  const vb = valueFor(b, key)
+  const aNull = va === null || va === undefined || (typeof va === "number" && !Number.isFinite(va))
+  const bNull = vb === null || vb === undefined || (typeof vb === "number" && !Number.isFinite(vb))
+  if (aNull && bNull) return 0
+  if (aNull) return 1
+  if (bNull) return -1
+  let cmp: number
+  if (typeof va === "number" && typeof vb === "number") cmp = va - vb
+  else cmp = String(va).localeCompare(String(vb))
+  return dir === "asc" ? cmp : -cmp
+}
+
+function nextDir(prev: SortDir, sameKey: boolean): SortDir {
+  if (!sameKey) return "desc"
+  if (prev === "desc") return "asc"
+  if (prev === "asc") return null
+  return "desc"
+}
+
+function SortHeader({
+  label,
+  align,
+  active,
+  dir,
+  onClick,
+  padX = "px-3",
+}: {
+  label: string
+  align: "left" | "right"
+  active: boolean
+  dir: SortDir
+  onClick: () => void
+  padX?: string
+}) {
+  const arrow = !active || !dir ? "↕" : dir === "asc" ? "↑" : "↓"
+  return (
+    <th
+      className={`${padX} py-2 ${align === "right" ? "text-right" : "text-left"}`}
+      aria-sort={
+        active && dir ? (dir === "asc" ? "ascending" : "descending") : "none"
+      }
+    >
+      <button
+        type="button"
+        onClick={onClick}
+        className="inline-flex items-center gap-1 font-mono text-[10px] uppercase tracking-[0.12em] transition-colors hover:text-text"
+        style={{ color: active ? "var(--text)" : "var(--text-faint)" }}
+      >
+        <span>{label}</span>
+        <span aria-hidden style={{ opacity: active ? 1 : 0.45 }}>
+          {arrow}
+        </span>
+      </button>
+    </th>
+  )
+}
+
 export function PositionsTable({
   rows,
   tab,
@@ -65,6 +168,16 @@ export function PositionsTable({
   rows: BookPositionRow[]
   tab: BookTab
 }) {
+  const [sort, setSort] = useState<{ key: SortKey; dir: SortDir }>({
+    key: "severity",
+    dir: null,
+  })
+
+  const sortedRows = useMemo(() => {
+    if (!sort.dir) return rows
+    return [...rows].sort((a, b) => compareRows(a, b, sort.key, sort.dir))
+  }, [rows, sort])
+
   if (rows.length === 0) {
     return (
       <section
@@ -81,14 +194,17 @@ export function PositionsTable({
     )
   }
 
+  // Only the flat (non-grouped) views are user-sortable. Grouped tabs
+  // (vintage/sector/sponsor) keep server-side grouping so the bucket
+  // structure stays meaningful.
   const grouped = tab === "vintage" || tab === "sector" || tab === "sponsor"
+  const displayRows = grouped ? rows : sortedRows
 
-  // For grouped views, build group buckets in order encountered.
   type Group = { key: string; rows: BookPositionRow[] }
   const groups: Group[] = []
   if (grouped) {
     const byKey = new Map<string, BookPositionRow[]>()
-    for (const r of rows) {
+    for (const r of displayRows) {
       const k = groupKey(r, tab)
       if (!byKey.has(k)) byKey.set(k, [])
       byKey.get(k)!.push(r)
@@ -97,8 +213,18 @@ export function PositionsTable({
       groups.push({ key, rows: list })
     })
   } else {
-    groups.push({ key: "", rows })
+    groups.push({ key: "", rows: displayRows })
   }
+
+  function handleSort(key: SortKey) {
+    setSort((prev) => {
+      const sameKey = prev.key === key
+      const dir = nextDir(prev.dir, sameKey)
+      return dir ? { key, dir } : { key, dir: null }
+    })
+  }
+
+  const canSort = !grouped
 
   return (
     <section
@@ -114,6 +240,11 @@ export function PositionsTable({
         </div>
         <div className="font-mono text-[10.5px] text-text-faint">
           {rows.length.toLocaleString()} {rows.length === 1 ? "row" : "rows"}
+          {canSort && sort.dir ? (
+            <span className="ml-2 normal-case tracking-normal text-text-dim">
+              · sorted by {sort.key.replace(/_/g, " ")} {sort.dir}
+            </span>
+          ) : null}
         </div>
       </div>
 
@@ -133,29 +264,91 @@ export function PositionsTable({
             )}
             <table className="w-full border-collapse text-left text-[12px]">
               <thead>
-                <tr
-                  className="font-mono text-[10px] uppercase tracking-[0.12em] text-text-faint"
-                  style={{ borderBottom: "1px solid var(--line)" }}
-                >
-                  <th className="px-5 py-2 text-left">sev</th>
-                  <th className="px-3 py-2 text-left">borrower</th>
-                  <th className="px-3 py-2 text-left">industry</th>
-                  <th className="px-3 py-2 text-left">vintage</th>
-                  <th className="px-3 py-2 text-right">prior FV</th>
-                  <th className="px-3 py-2 text-right">current FV</th>
-                  <th className="px-3 py-2 text-right">change</th>
-                  <th className="px-5 py-2 text-left">filing</th>
-                </tr>
+                {canSort ? (
+                  <tr style={{ borderBottom: "1px solid var(--line)" }}>
+                    <SortHeader
+                      label="sev"
+                      align="left"
+                      padX="px-5"
+                      active={sort.key === "severity"}
+                      dir={sort.key === "severity" ? sort.dir : null}
+                      onClick={() => handleSort("severity")}
+                    />
+                    <SortHeader
+                      label="borrower"
+                      align="left"
+                      active={sort.key === "borrower"}
+                      dir={sort.key === "borrower" ? sort.dir : null}
+                      onClick={() => handleSort("borrower")}
+                    />
+                    <SortHeader
+                      label="industry"
+                      align="left"
+                      active={sort.key === "industry"}
+                      dir={sort.key === "industry" ? sort.dir : null}
+                      onClick={() => handleSort("industry")}
+                    />
+                    <SortHeader
+                      label="vintage"
+                      align="left"
+                      active={sort.key === "vintage"}
+                      dir={sort.key === "vintage" ? sort.dir : null}
+                      onClick={() => handleSort("vintage")}
+                    />
+                    <SortHeader
+                      label="prior FV"
+                      align="right"
+                      active={sort.key === "prior_fv"}
+                      dir={sort.key === "prior_fv" ? sort.dir : null}
+                      onClick={() => handleSort("prior_fv")}
+                    />
+                    <SortHeader
+                      label="current FV"
+                      align="right"
+                      active={sort.key === "current_fv"}
+                      dir={sort.key === "current_fv" ? sort.dir : null}
+                      onClick={() => handleSort("current_fv")}
+                    />
+                    <SortHeader
+                      label="change"
+                      align="right"
+                      active={sort.key === "fv_change_pct"}
+                      dir={sort.key === "fv_change_pct" ? sort.dir : null}
+                      onClick={() => handleSort("fv_change_pct")}
+                    />
+                    <SortHeader
+                      label="accrual"
+                      align="left"
+                      active={sort.key === "accrual"}
+                      dir={sort.key === "accrual" ? sort.dir : null}
+                      onClick={() => handleSort("accrual")}
+                    />
+                    <th className="px-5 py-2 text-left font-mono text-[10px] uppercase tracking-[0.12em] text-text-faint">
+                      filing
+                    </th>
+                  </tr>
+                ) : (
+                  <tr
+                    className="font-mono text-[10px] uppercase tracking-[0.12em] text-text-faint"
+                    style={{ borderBottom: "1px solid var(--line)" }}
+                  >
+                    <th className="px-5 py-2 text-left">sev</th>
+                    <th className="px-3 py-2 text-left">borrower</th>
+                    <th className="px-3 py-2 text-left">industry</th>
+                    <th className="px-3 py-2 text-left">vintage</th>
+                    <th className="px-3 py-2 text-right">prior FV</th>
+                    <th className="px-3 py-2 text-right">current FV</th>
+                    <th className="px-3 py-2 text-right">change</th>
+                    <th className="px-3 py-2 text-left">accrual</th>
+                    <th className="px-5 py-2 text-left">filing</th>
+                  </tr>
+                )}
               </thead>
               <tbody>
                 {g.rows.map((r) => {
                   const sev = r.severity_100
                   const chip = severityChip(sev)
                   const isNonAccrual = r.accrual_status === "non_accrual"
-                  const subParts: string[] = []
-                  if (r.detector_name) subParts.push(r.detector_name)
-                  if (isNonAccrual) subParts.push("non-accrual")
-                  else if (r.is_pik) subParts.push("PIK")
                   return (
                     <tr
                       key={r.hit_id}
@@ -183,11 +376,10 @@ export function PositionsTable({
                             "—"
                           )}
                         </div>
-                        {subParts.length > 0 && (
-                          <div className="mt-0.5 font-mono text-[10.5px] text-text-faint">
-                            {subParts.join(" · ")}
-                          </div>
-                        )}
+                        <div className="mt-0.5 font-mono text-[10.5px] text-text-faint">
+                          {r.detector_name.replace(/_/g, " ")}
+                          {r.is_pik === true ? " · PIK" : ""}
+                        </div>
                       </td>
                       <td className="px-3 py-3 align-top font-mono text-[11px] text-text-dim">
                         {r.industry ?? "—"}
@@ -206,6 +398,19 @@ export function PositionsTable({
                         style={{ color: changeColor(r.fv_change_pct) }}
                       >
                         {fmtChange(r.fv_change_pct)}
+                      </td>
+                      <td className="px-3 py-3 align-top font-mono text-[11px]">
+                        {r.accrual_status ? (
+                          <span
+                            style={{
+                              color: isNonAccrual ? "var(--red)" : "var(--text-dim)",
+                            }}
+                          >
+                            {r.accrual_status.replace(/_/g, "-")}
+                          </span>
+                        ) : (
+                          <span className="text-text-faint">—</span>
+                        )}
                       </td>
                       <td className="px-5 py-3 align-top font-mono text-[10.5px] text-text-dim">
                         {r.filing_url ? (

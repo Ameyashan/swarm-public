@@ -11,7 +11,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     { path: "/peer", priority: 0.9 },
     { path: "/patterns", priority: 0.8 },
     { path: "/memo", priority: 0.8 },
-    { path: "/borrower/MRI%20Software", priority: 0.7 },
+    { path: `/borrower/${encodeURIComponent("MRI Software LLC")}`, priority: 0.7 },
   ]
   return surfaces.map((s) => ({
     url: `${SITE_URL}${s.path}`,

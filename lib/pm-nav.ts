@@ -13,7 +13,14 @@ export type PmNavLink = {
 export const PM_NAV: PmNavLink[] = [
   { href: "/", label: "Briefing", match: "/" },
   { href: "/book", label: "Position book", match: "/book" },
-  { href: "/borrower/MRI%20Software", label: "Borrower x-ray", match: "/borrower" },
+  // Use the exact canonical name as it appears in observations
+  // (`MRI Software LLC`). The borrower x-ray does an `.eq()` lookup against
+  // `portfolio_company_canonical`, so an inexact alias would render blank.
+  {
+    href: `/borrower/${encodeURIComponent("MRI Software LLC")}`,
+    label: "Borrower x-ray",
+    match: "/borrower",
+  },
   { href: "/peer", label: "Peer telemetry", match: "/peer" },
   { href: "/patterns", label: "Patterns", match: "/patterns" },
   { href: "/memo", label: "Memo composer", match: "/memo" },

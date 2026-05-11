@@ -8,7 +8,7 @@ import {
   type LiftStat,
   type ComposerResults,
 } from "@/lib/patterns/queries"
-import { parsePatternQuery } from "@/lib/patterns/parse"
+import { parsePatternQuery, parsePatternQueryHeuristic } from "@/lib/patterns/parse"
 import { EMPTY_FILTERS, type ParsedQuery } from "@/lib/patterns/schema"
 import { PatternsComposer, type ComposerResultsClient } from "./composer"
 import { ClusterCardView } from "@/components/patterns/cluster-card"
@@ -49,17 +49,16 @@ export default async function PatternsPage() {
     query_plan: [],
   }
 
-  if (!apiKeyMissing) {
-    const parseRes = await parsePatternQuery(DEFAULT_QUERY)
+  {
+    const parseRes = apiKeyMissing
+      ? parsePatternQueryHeuristic(DEFAULT_QUERY)
+      : await parsePatternQuery(DEFAULT_QUERY)
     if (parseRes.ok) {
       initialParsed = parseRes.parsed
       initialResults = await runComposerQuery(parseRes.parsed.filters)
     } else {
       initialParseError = parseRes.error
     }
-  } else {
-    initialParseError =
-      "ANTHROPIC_API_KEY is not set on the server. The composer will not be able to parse natural-language queries until it is set."
   }
 
   const [presetClusters, lift, clusterCount] = await Promise.all([
@@ -87,10 +86,15 @@ export default async function PatternsPage() {
 
       {apiKeyMissing ? (
         <div
-          className="rounded-[8px] border px-4 py-3 font-mono text-[11.5px]"
+          className="rounded-[8px] border px-4 py-3 font-mono text-[11.5px] leading-[1.55]"
           style={{ background: "var(--amber-bg)", borderColor: "var(--amber)", color: "var(--amber)" }}
         >
-          ⚠ <strong>ANTHROPIC_API_KEY</strong> is not set on the server. The composer below will refuse natural-language queries until it is set. Preset clusters and the lift backtests below remain live (they don&apos;t require the model).
+          <div>
+            <strong>Local parser active</strong> — <code>ANTHROPIC_API_KEY</code> is not set on the server, so the composer is running a deterministic regex parser instead of the LLM. Common phrasings (funds, sponsors, industries, windows, severity, PIK, accrual, &ldquo;held by N funds&rdquo;) work; nuanced rephrasing won&rsquo;t.
+          </div>
+          <div className="mt-1 text-text-dim">
+            To enable the full natural-language parser, add <code>ANTHROPIC_API_KEY</code> in Vercel &rarr; Project &rarr; Settings &rarr; Environment Variables (Production + Preview), then redeploy. Preset clusters and lift backtests below are live and don&rsquo;t require the key.
+          </div>
         </div>
       ) : null}
 

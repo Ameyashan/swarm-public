@@ -101,19 +101,31 @@ function filingUrl(hd: Record<string, any> | null | undefined): string | null {
 function rowFromHit(h: DetectorHitRow): BookPositionRow {
   const hd = h.hit_data ?? {}
   const sev100 = sevScore100(h.severity_score)
-  const priorFv =
+  // hit_data.{fv_prior,fv_current} are stored in **thousands** of dollars
+  // (matching the observations.fair_value convention). Multiply by 1000 at
+  // this boundary so the table can format with the same "$Xm/$XB" rules as
+  // every other surface in the app.
+  const priorFvK =
     asNumber(hd.prior_fv) ??
     asNumber(hd.prior_fair_value) ??
     asNumber(hd.fv_prior) ??
     null
-  const currentFv =
+  const currentFvK =
     asNumber(hd.current_fv) ??
     asNumber(hd.current_fair_value) ??
     asNumber(hd.fv_current) ??
     null
+  const priorFv = priorFvK === null ? null : priorFvK * 1000
+  const currentFv = currentFvK === null ? null : currentFvK * 1000
+  // hit_data.fv_change_pct is stored as a fraction (-0.97 = −97%); when we
+  // compute it ourselves from FV we already produce percentage points.
+  // Normalize to percentage points here so the table can format directly.
   let fvChange = asNumber(hd.fv_change_pct)
-  if (fvChange === null && priorFv && currentFv !== null && priorFv !== 0) {
-    fvChange = ((currentFv - priorFv) / Math.abs(priorFv)) * 100
+  if (fvChange !== null && Math.abs(fvChange) <= 1.5) {
+    fvChange = fvChange * 100
+  }
+  if (fvChange === null && priorFvK !== null && currentFvK !== null && priorFvK !== 0) {
+    fvChange = ((currentFvK - priorFvK) / Math.abs(priorFvK)) * 100
   }
   const industry =
     asString(hd.industry) ||
@@ -221,7 +233,10 @@ export const getFundBookStats = cache(
     let naFv = 0
     let naCount = 0
     for (const r of rows) {
-      const fv = Number(r.fair_value ?? 0)
+      // observations.fair_value is in thousands of dollars — convert at the
+      // boundary so the stat cards format with the same M/B rules as
+      // everywhere else.
+      const fv = Number(r.fair_value ?? 0) * 1000
       if (!Number.isFinite(fv)) continue
       totalFv += fv
       if (r.is_pik) pikFv += fv
@@ -282,6 +297,66 @@ export const getFundBookPositions = cache(
     }
 
     const all = (data ?? []).map(rowFromHit)
+
+    // Backfill missing accrual_status from the matching observation row.
+    // detector_hits.hit_data doesn't always carry the value; the position's
+    // own filing row does.
+    {
+      type ObsKey = { ticker: string; borrower: string; period: string }
+      const needed: ObsKey[] = []
+      for (const row of all) {
+        if (row.accrual_status) continue
+        if (!row.fund_ticker || !row.borrower || !row.current_period_end) continue
+        needed.push({
+          ticker: row.fund_ticker,
+          borrower: row.borrower,
+          period: row.current_period_end,
+        })
+      }
+      if (needed.length > 0) {
+        const borrowers = Array.from(new Set(needed.map((k) => k.borrower)))
+        const periods = Array.from(new Set(needed.map((k) => k.period)))
+        // One query bounded by the loaded hit set. The PostgREST `in` filter
+        // is fine for hundreds of borrowers — same approach as the other
+        // bulk lookups in this file.
+        type ObsHit = {
+          fund_ticker: string
+          portfolio_company_canonical: string
+          period_end: string
+          accrual_status: string | null
+          is_pik: boolean | null
+        }
+        const { data: obs, error: obsErr } = await supabase
+          .from("observations")
+          .select(
+            "fund_ticker, portfolio_company_canonical, period_end, accrual_status, is_pik",
+          )
+          .eq("fund_ticker", fund)
+          .in("portfolio_company_canonical", borrowers)
+          .in("period_end", periods)
+        if (obsErr) {
+          console.error("getFundBookPositions obs accrual err", fund, obsErr)
+        }
+        const accrualIdx = new Map<string, string | null>()
+        const pikIdx = new Map<string, boolean | null>()
+        for (const r of (obs ?? []) as ObsHit[]) {
+          const key = `${r.fund_ticker}|${r.portfolio_company_canonical}|${r.period_end}`
+          if (r.accrual_status) accrualIdx.set(key, r.accrual_status)
+          // Treat is_pik as positive only when any tranche is PIK at this period.
+          if (r.is_pik === true) pikIdx.set(key, true)
+        }
+        for (const row of all) {
+          if (!row.fund_ticker || !row.borrower || !row.current_period_end) continue
+          const key = `${row.fund_ticker}|${row.borrower}|${row.current_period_end}`
+          if (!row.accrual_status && accrualIdx.has(key)) {
+            row.accrual_status = accrualIdx.get(key) ?? null
+          }
+          if (row.is_pik === null && pikIdx.has(key)) {
+            row.is_pik = pikIdx.get(key) ?? null
+          }
+        }
+      }
+    }
 
     // Dedupe by borrower; keep the most informative hit (highest severity,
     // tie-broken by most negative fv_change_pct).

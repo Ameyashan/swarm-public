@@ -155,65 +155,65 @@ export const getRecentGoldmanHits = cache(async (limit = 30) => {
 export const getGoldmanEnrichmentEvents = cache(async (limit = 40) => {
   const supabase = createClient()
 
-  // Pull a generous slice of recent enrichments; we filter to Goldman hits
-  // after the join.
-  const { data: enrichRows, error: enrichErr } = await supabase
-    .from("enrichments")
-    .select(
-      "detector_hit_id, litigation_items, management_changes, news_items, created_at",
-    )
-    .order("created_at", { ascending: false })
-    .limit(200)
-
-  if (enrichErr) {
-    console.error("getGoldmanEnrichmentEvents enrich error", enrichErr)
-    return [] as EnrichmentJoined[]
-  }
-
-  type RawEnrich = {
-    detector_hit_id: string
-    litigation_items: LitigationItem[] | null
-    management_changes: ManagementChangeItem[] | null
-    news_items: NewsItem[] | null
-  }
-
-  const enriched = (enrichRows ?? []) as RawEnrich[]
-  const candidateIds = enriched
-    .filter((r) => {
-      const a = Array.isArray(r.litigation_items) ? r.litigation_items.length : 0
-      const b = Array.isArray(r.management_changes) ? r.management_changes.length : 0
-      const c = Array.isArray(r.news_items) ? r.news_items.length : 0
-      return a + b + c > 0
-    })
-    .map((r) => r.detector_hit_id)
-
-  if (candidateIds.length === 0) return [] as EnrichmentJoined[]
-
-  const { data: hitRows, error: hitErr } = await supabase
+  // 1) Get Goldman detector_hits ordered by severity (so strongest first).
+  //    Cap at a generous slice — we only need enough to backfill `limit`
+  //    rows after filtering to enrichments with non-empty arrays.
+  const { data: goldmanHits, error: hitErr } = await supabase
     .from("detector_hits")
     .select(
       "id, detector_name, fund_ticker, portfolio_company_canonical, current_period_end, prior_period_end, severity_score, hit_data, cited_source_urls, created_at",
     )
-    .in("id", candidateIds)
     .in("fund_ticker", GOLDMAN_FUNDS as unknown as string[])
+    .order("severity_score", { ascending: false, nullsFirst: false })
+    .limit(500)
     .returns<DetectorHitRow[]>()
 
   if (hitErr) {
     console.error("getGoldmanEnrichmentEvents hit error", hitErr)
     return [] as EnrichmentJoined[]
   }
+  const hits = goldmanHits ?? []
+  if (hits.length === 0) return [] as EnrichmentJoined[]
 
-  const byId = new Map((hitRows ?? []).map((h) => [h.id, h]))
-  const joined: EnrichmentJoined[] = enriched
-    .filter((r) => byId.has(r.detector_hit_id))
+  // 2) Fetch enrichments for those hit ids (chunked under PostgREST limits).
+  type RawEnrich = {
+    detector_hit_id: string
+    litigation_items: LitigationItem[] | null
+    management_changes: ManagementChangeItem[] | null
+    news_items: NewsItem[] | null
+  }
+  const hitIds = hits.map((h) => h.id)
+  const enrichRows: RawEnrich[] = []
+  for (let i = 0; i < hitIds.length; i += 300) {
+    const slice = hitIds.slice(i, i + 300)
+    const { data, error } = await supabase
+      .from("enrichments")
+      .select(
+        "detector_hit_id, litigation_items, management_changes, news_items",
+      )
+      .in("detector_hit_id", slice)
+    if (error) {
+      console.error("getGoldmanEnrichmentEvents enrich error", error)
+      continue
+    }
+    for (const r of (data ?? []) as RawEnrich[]) enrichRows.push(r)
+  }
+
+  const byHitId = new Map<string, DetectorHitRow>(hits.map((h) => [h.id, h]))
+  const joined: EnrichmentJoined[] = enrichRows
+    .filter((r) => {
+      const a = Array.isArray(r.litigation_items) ? r.litigation_items.length : 0
+      const b = Array.isArray(r.management_changes) ? r.management_changes.length : 0
+      const c = Array.isArray(r.news_items) ? r.news_items.length : 0
+      return a + b + c > 0 && byHitId.has(r.detector_hit_id)
+    })
     .map((r) => ({
       detector_hit_id: r.detector_hit_id,
       litigation_items: r.litigation_items ?? null,
       management_changes: r.management_changes ?? null,
       news_items: r.news_items ?? null,
-      hit: byId.get(r.detector_hit_id) ?? null,
+      hit: byHitId.get(r.detector_hit_id) ?? null,
     }))
-    // Rank by hit severity so the strongest signals surface first.
     .sort((a, b) => (b.hit?.severity_score ?? 0) - (a.hit?.severity_score ?? 0))
     .slice(0, limit)
 
@@ -224,29 +224,35 @@ export const getGoldmanEnrichmentEvents = cache(async (limit = 40) => {
  * Peer telemetry per fund — PIK share, non-accrual share/count, and total FV
  * at the latest reporting period for each fund. Used by the peer-rank panel.
  */
+// The 6-BDC universe the peer telemetry panel always wants. We include
+// Goldman first; remaining funds we discover get appended after.
+const PEER_UNIVERSE = ["GSCR", "GSBD", "ARCC", "GBDC", "MAIN", "OBDC"]
+
 export const getPeerTelemetry = cache(async () => {
   const supabase = createClient()
 
-  // 1) Latest period per fund.
-  const { data: periodsData, error: periodsErr } = await supabase
+  // 1) Discover the live fund universe. Most BDCs in our cohort sit on the
+  //    same latest period (e.g., 2026‑03‑31); GSCR may lag by a quarter.
+  //    We can't trust a global `.limit(N)` here — the largest funds (GBDC,
+  //    ARCC) each have >5k observations at the latest period and would
+  //    evict GSCR. Instead we resolve each fund's *own* latest period
+  //    independently.
+  const { data: tickersData, error: tickersErr } = await supabase
     .from("observations")
-    .select("fund_ticker, period_end")
-    .order("period_end", { ascending: false })
-    .limit(5000)
-  if (periodsErr) {
-    console.error("getPeerTelemetry periods error", periodsErr)
-    return [] as FundPeerStats[]
+    .select("fund_ticker")
+    .limit(50000)
+  if (tickersErr) {
+    console.error("getPeerTelemetry tickers error", tickersErr)
   }
-  type PeriodRow = { fund_ticker: string; period_end: string }
-  const latestByFund = new Map<string, string>()
-  for (const row of (periodsData ?? []) as PeriodRow[]) {
-    if (!row.fund_ticker || !row.period_end) continue
-    const cur = latestByFund.get(row.fund_ticker)
-    if (!cur || row.period_end > cur) latestByFund.set(row.fund_ticker, row.period_end)
+  const discovered = new Set<string>()
+  for (const row of (tickersData ?? []) as { fund_ticker: string | null }[]) {
+    if (row.fund_ticker) discovered.add(row.fund_ticker)
   }
-  if (latestByFund.size === 0) return [] as FundPeerStats[]
+  const tickers = Array.from(
+    new Set([...PEER_UNIVERSE, ...Array.from(discovered)]),
+  )
 
-  // 2) Pull observations for each fund at its latest period.
+  // 2) Resolve the per-fund latest period, then fetch only that slice.
   type ObsRow = {
     fund_ticker: string
     period_end: string
@@ -255,9 +261,25 @@ export const getPeerTelemetry = cache(async () => {
     accrual_status: string | null
   }
 
+  const latestByFund = new Map<string, string>()
+  for (const ticker of tickers) {
+    const { data, error } = await supabase
+      .from("observations")
+      .select("period_end")
+      .eq("fund_ticker", ticker)
+      .order("period_end", { ascending: false, nullsFirst: false })
+      .limit(1)
+    if (error) {
+      console.error("getPeerTelemetry latest-period err", ticker, error)
+      continue
+    }
+    const p = ((data ?? [])[0] as { period_end?: string } | undefined)?.period_end
+    if (p) latestByFund.set(ticker, p)
+  }
+  if (latestByFund.size === 0) return [] as FundPeerStats[]
+
   const obsAccum: ObsRow[] = []
-  const latestEntries = Array.from(latestByFund.entries())
-  for (const [ticker, period] of latestEntries) {
+  for (const [ticker, period] of Array.from(latestByFund.entries())) {
     const { data, error } = await supabase
       .from("observations")
       .select("fund_ticker, period_end, fair_value, is_pik, accrual_status")
@@ -271,6 +293,10 @@ export const getPeerTelemetry = cache(async () => {
   }
 
   // 3) Aggregate per fund.
+  //    NOTE on scale: `observations.fair_value` is stored in **thousands**
+  //    of dollars. We multiply by 1000 at this boundary so every downstream
+  //    consumer (peer panels, briefing peer-rank, memo) can treat the value
+  //    as whole dollars.
   const stats = new Map<string, FundPeerStats>()
   for (const row of obsAccum) {
     const t = row.fund_ticker
@@ -286,8 +312,9 @@ export const getPeerTelemetry = cache(async () => {
       })
     }
     const s = stats.get(t)!
-    const fv = Number(row.fair_value ?? 0)
-    if (!Number.isFinite(fv)) continue
+    const fvThousands = Number(row.fair_value ?? 0)
+    if (!Number.isFinite(fvThousands)) continue
+    const fv = fvThousands * 1000
     s.total_fv_dollars = (s.total_fv_dollars ?? 0) + fv
     if (row.is_pik) s.pik_pct = (s.pik_pct ?? 0) + fv
     if (row.accrual_status === "non_accrual") {
@@ -295,7 +322,6 @@ export const getPeerTelemetry = cache(async () => {
       s.na_count = (s.na_count ?? 0) + 1
     }
   }
-  // Convert weighted sums to percentages.
   const statsArr = Array.from(stats.values())
   for (const s of statsArr) {
     const total = s.total_fv_dollars ?? 0
