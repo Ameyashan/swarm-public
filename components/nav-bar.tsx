@@ -1,25 +1,16 @@
-import Link from "next/link"
+"use client"
 
-// Six surfaces of the PM workflow, in the exact order required by the spec.
-// Path "/borrower/MRI%20Software" matches the prompt verbatim — the borrower
-// X-ray landing route uses MRI Software as the default canonical example.
-export const PM_NAV: Array<{
-  href: string
-  label: string
-  badge?: string
-}> = [
-  { href: "/", label: "Briefing" },
-  { href: "/book", label: "Position book" },
-  { href: "/borrower/MRI%20Software", label: "Borrower x-ray" },
-  { href: "/peer", label: "Peer telemetry" },
-  { href: "/patterns", label: "Patterns" },
-  { href: "/memo", label: "Memo composer" },
-]
+import Link from "next/link"
+import { usePathname } from "next/navigation"
+import { PM_NAV, isActiveNav } from "@/lib/pm-nav"
+
+export { PM_NAV } from "@/lib/pm-nav"
 
 export function NavBar() {
+  const pathname = usePathname()
   return (
     <header
-      className="sticky top-0 z-30 h-12 w-full border-b backdrop-blur"
+      className="sticky top-0 z-30 h-12 w-full border-b backdrop-blur print:hidden"
       style={{
         background: "rgba(245, 241, 232, 0.92)",
         borderColor: "var(--line)",
@@ -41,15 +32,24 @@ export function NavBar() {
         </Link>
 
         <nav className="ml-3 flex items-center gap-[2px]" aria-label="PM workspace">
-          {PM_NAV.map((l) => (
-            <Link
-              key={l.href}
-              href={l.href}
-              className="rounded-[5px] px-3 py-[7px] font-mono text-[11.5px] text-text-dim transition-colors hover:bg-bg-2 hover:text-text"
-            >
-              {l.label}
-            </Link>
-          ))}
+          {PM_NAV.map((l) => {
+            const active = isActiveNav(pathname, l.match)
+            return (
+              <Link
+                key={l.href}
+                href={l.href}
+                aria-current={active ? "page" : undefined}
+                className="rounded-[5px] px-3 py-[7px] font-mono text-[11.5px] transition-colors hover:bg-bg-2 hover:text-text"
+                style={
+                  active
+                    ? { background: "var(--gs-bg)", color: "var(--gs)" }
+                    : { color: "var(--text-dim)" }
+                }
+              >
+                {l.label}
+              </Link>
+            )
+          })}
         </nav>
 
         <div className="ml-auto flex items-center gap-3 font-mono text-[11px] text-text-dim">

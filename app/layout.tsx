@@ -2,6 +2,7 @@ import type { Metadata } from "next"
 import { Inter, JetBrains_Mono, Source_Serif_4 } from "next/font/google"
 import "./globals.css"
 import { NavBar } from "@/components/nav-bar"
+import { Toaster } from "sonner"
 
 const inter = Inter({
   subsets: ["latin"],
@@ -56,6 +57,17 @@ export default function RootLayout({
         <div className="mx-auto w-full max-w-[1280px] px-6 py-6">
           {children}
         </div>
+        <Toaster
+          position="bottom-right"
+          toastOptions={{
+            style: {
+              background: "var(--bg-1)",
+              border: "0.5px solid var(--line)",
+              color: "var(--text)",
+              fontFamily: "var(--sans)",
+            },
+          }}
+        />
       </body>
     </html>
   )
