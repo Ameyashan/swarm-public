@@ -9,6 +9,7 @@ import {
   type DailyMarkResult,
   type IdioInput,
 } from "@/lib/nav/methodology"
+import { runReconciliation } from "@/lib/nav/reconcile"
 
 // Yield-vs-price classification per benchmark code. FRED OAS / Treasury series
 // are yields (percent); ETF closes are prices.
@@ -48,6 +49,7 @@ export type RunSummary = {
   positions_seen: number
   marks_written: number
   marks_skipped: number
+  reconciliation_inserted: number
   errors: string[]
 }
 
@@ -94,6 +96,7 @@ export async function runDailyMarks(opts: {
     positions_seen: 0,
     marks_written: 0,
     marks_skipped: 0,
+    reconciliation_inserted: 0,
     errors: [],
   }
 
@@ -299,5 +302,18 @@ export async function runDailyMarks(opts: {
     return summary
   }
   summary.marks_written = count ?? writes.length
+
+  // Trailing reconciliation — opportunistic. Any new observations row with a
+  // model mark at-or-before its period_end gets persisted as drift in bps.
+  // Failures here are non-fatal; the daily marks are already written.
+  try {
+    const reco = await runReconciliation({ fund, methodology_version: METHODOLOGY_VERSION })
+    summary.reconciliation_inserted = reco.rows_inserted
+    if (reco.errors.length) summary.errors.push(...reco.errors.map((e) => `reconcile: ${e}`))
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err)
+    summary.errors.push(`reconcile: ${msg}`)
+  }
+
   return summary
 }

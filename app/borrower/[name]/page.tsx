@@ -96,6 +96,7 @@ export default async function BorrowerXrayPage({
             series={xray.series}
             events={xray.events}
             borrowerName={xray.meta.canonical_name}
+            dailySeries={xray.daily_series}
           />
           {xray.note && (
             <p

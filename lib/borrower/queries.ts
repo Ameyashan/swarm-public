@@ -120,6 +120,24 @@ export type BorrowerXray = {
   backtest: BorrowerBacktest | null
   quarters_rendered: number
   note: string | null
+  daily_series: BorrowerDailySeries[]
+}
+
+// Phase 2 — daily NAV series tacked onto the borrower x-ray. One point per
+// (fund, mark_date) over the last `days` calendar days. mark_pct is computed
+// from daily_marks; null when the model row has no cost reference.
+export type BorrowerDailyPoint = {
+  mark_date: string
+  fv_dollars: number
+  mark_pct: number | null
+  delta_bps: number | null
+  requires_review: boolean
+}
+
+export type BorrowerDailySeries = {
+  fund_ticker: string
+  is_goldman: boolean
+  points: BorrowerDailyPoint[]
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -984,15 +1002,68 @@ const getBacktestAcrossUniverse = cache(async (): Promise<BorrowerBacktest | nul
 // Top-level: assemble the borrower x-ray
 // ─────────────────────────────────────────────────────────────────────────────
 
+async function fetchBorrowerDailySeries(
+  borrower: string,
+  days: number,
+): Promise<BorrowerDailySeries[]> {
+  const supabase = createClient()
+  const sinceIso = new Date(Date.now() - days * 86_400_000)
+    .toISOString()
+    .slice(0, 10)
+  type Row = {
+    fund_ticker: string
+    mark_date: string
+    fair_value_estimated: number
+    mark_pct: number | null
+    delta_bps: number | null
+    requires_review: boolean
+  }
+  const { data, error } = await supabase
+    .from("daily_marks")
+    .select("fund_ticker, mark_date, fair_value_estimated, mark_pct, delta_bps, requires_review")
+    .eq("portfolio_company_canonical", borrower)
+    .gte("mark_date", sinceIso)
+    .order("mark_date", { ascending: true })
+    .limit(2000)
+  if (error || !data || data.length === 0) return []
+  const byFund = new Map<string, BorrowerDailyPoint[]>()
+  for (const r of data as Row[]) {
+    const arr = byFund.get(r.fund_ticker) ?? []
+    arr.push({
+      mark_date: r.mark_date,
+      fv_dollars: Number(r.fair_value_estimated) * 1000,
+      mark_pct: r.mark_pct === null ? null : Number(r.mark_pct),
+      delta_bps: r.delta_bps === null ? null : Number(r.delta_bps),
+      requires_review: r.requires_review === true,
+    })
+    byFund.set(r.fund_ticker, arr)
+  }
+  const out: BorrowerDailySeries[] = []
+  for (const [fund, points] of Array.from(byFund.entries())) {
+    out.push({
+      fund_ticker: fund,
+      is_goldman: isGoldman(fund),
+      points,
+    })
+  }
+  out.sort((a, b) => {
+    if (a.is_goldman && !b.is_goldman) return -1
+    if (!a.is_goldman && b.is_goldman) return 1
+    return a.fund_ticker.localeCompare(b.fund_ticker)
+  })
+  return out
+}
+
 export const getBorrowerXray = cache(
   async (name: string): Promise<BorrowerXray | null> => {
     if (!name || !name.trim()) return null
     const borrower = name.trim()
 
-    const [rawObs, hits, canonical] = await Promise.all([
+    const [rawObs, hits, canonical, dailySeries] = await Promise.all([
       fetchObservations(borrower),
       fetchBorrowerHits(borrower),
       fetchBorrowerCanonical(borrower),
+      fetchBorrowerDailySeries(borrower, 30),
     ])
 
     if (rawObs.length === 0 && hits.length === 0) return null
@@ -1069,6 +1140,7 @@ export const getBorrowerXray = cache(
       backtest,
       quarters_rendered: quartersRendered,
       note,
+      daily_series: dailySeries,
     }
   },
 )

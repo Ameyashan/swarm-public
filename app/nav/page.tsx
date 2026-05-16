@@ -5,6 +5,8 @@ import {
   getLatestMarkDate,
   summarize,
 } from "@/lib/nav/queries"
+import { getReconciliationStats } from "@/lib/nav/reconcile"
+import { AccuracyCard } from "@/components/nav/accuracy-card"
 import { DailyMarksTable } from "@/components/nav/daily-marks-table"
 import { MoverTiles } from "@/components/nav/mover-tile"
 import { ReviewQueue } from "@/components/nav/review-queue"
@@ -29,9 +31,10 @@ export default async function NavPage({ searchParams }: { searchParams: SearchPa
   const explicitDate = searchParams.date && /^\d{4}-\d{2}-\d{2}$/.test(searchParams.date)
     ? searchParams.date
     : null
-  const [latestDate, methodology] = await Promise.all([
+  const [latestDate, methodology, accuracy] = await Promise.all([
     explicitDate ? Promise.resolve(explicitDate) : getLatestMarkDate(fund),
     getCurrentMethodology(),
+    getReconciliationStats(fund),
   ])
   const rows = await getDailyMarks(fund, latestDate)
   const summary = summarize(rows)
@@ -59,6 +62,8 @@ export default async function NavPage({ searchParams }: { searchParams: SearchPa
       </header>
 
       <MoverTiles summary={summary} methodologyVersion={methodology?.version ?? null} />
+
+      <AccuracyCard stats={accuracy} />
 
       {rows.length === 0 ? (
         <EmptyState fund={fund} />

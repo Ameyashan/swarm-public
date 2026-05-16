@@ -1,4 +1,8 @@
-import type { BorrowerEventPin, BorrowerMarkSeries } from "@/lib/borrower/queries"
+import type {
+  BorrowerDailySeries,
+  BorrowerEventPin,
+  BorrowerMarkSeries,
+} from "@/lib/borrower/queries"
 
 function quarterLabel(iso: string): string {
   const d = new Date(iso)
@@ -18,10 +22,12 @@ export function MarkChart({
   series,
   events,
   borrowerName,
+  dailySeries,
 }: {
   series: BorrowerMarkSeries[]
   events: BorrowerEventPin[]
   borrowerName: string
+  dailySeries?: BorrowerDailySeries[]
 }) {
   // Collect the union of periods.
   const periodSet = new Set<string>()
@@ -379,6 +385,121 @@ export function MarkChart({
             </span>
           </span>
         </div>
+
+        {dailySeries && dailySeries.length > 0 ? (
+          <DailyTail series={dailySeries} />
+        ) : null}
+      </div>
+    </div>
+  )
+}
+
+// 30-day daily mark tail. Renders one sparkline per Goldman fund holding this
+// borrower. Shows mark trajectory between quarterly reports — decision-support
+// only, never a replacement for the period-end fair value above.
+function DailyTail({ series }: { series: BorrowerDailySeries[] }) {
+  const W = 180
+  const H = 40
+  return (
+    <div
+      className="mt-4 border-t pt-3"
+      style={{ borderColor: "var(--line)" }}
+    >
+      <div className="mb-2 flex items-baseline justify-between gap-3 px-2">
+        <div>
+          <div className="font-mono text-[10.5px] uppercase tracking-[0.16em] text-text-faint">
+            daily NAV tail · last 30 days
+          </div>
+          <div className="mt-0.5 font-serif text-[12.5px] italic text-text-dim">
+            Modeled daily marks between filings. Decision-support, not a 40-Act mark.
+          </div>
+        </div>
+      </div>
+      <div className="flex flex-wrap gap-4 px-2">
+        {series.map((s) => {
+          const pts = s.points.filter(
+            (p) => p.mark_pct !== null && Number.isFinite(p.mark_pct),
+          )
+          if (pts.length === 0) return null
+          const marks = pts.map((p) => p.mark_pct as number)
+          const yMin = Math.min(...marks)
+          const yMax = Math.max(...marks)
+          const yPad = Math.max(0.3, (yMax - yMin) * 0.25)
+          const yLo = yMin - yPad
+          const yHi = yMax + yPad
+          const xFor = (i: number) =>
+            pts.length === 1 ? W / 2 : (i / (pts.length - 1)) * W
+          const yFor = (m: number) =>
+            yHi === yLo ? H / 2 : H - ((m - yLo) / (yHi - yLo)) * H
+          const d = pts
+            .map((p, i) => {
+              const x = xFor(i)
+              const y = yFor(p.mark_pct as number)
+              return `${i === 0 ? "M" : "L"} ${x.toFixed(1)} ${y.toFixed(1)}`
+            })
+            .join(" ")
+          const last = pts[pts.length - 1]
+          const stroke = s.is_goldman ? "var(--gs)" : "var(--text-faint)"
+          const reviewFlag = pts.some((p) => p.requires_review)
+          return (
+            <div
+              key={`tail-${s.fund_ticker}`}
+              className="flex items-center gap-3 rounded-md border px-3 py-2"
+              style={{ borderColor: "var(--line)", background: "var(--bg-1)" }}
+            >
+              <svg
+                viewBox={`0 0 ${W} ${H}`}
+                width={W}
+                height={H}
+                role="img"
+                aria-label={`${s.fund_ticker} 30-day daily mark trail`}
+              >
+                <path d={d} fill="none" stroke={stroke} strokeWidth={1.6} />
+                <circle
+                  cx={xFor(pts.length - 1)}
+                  cy={yFor(last.mark_pct as number)}
+                  r={2.5}
+                  fill={stroke}
+                />
+              </svg>
+              <div className="font-mono text-[11px] leading-tight">
+                <div
+                  className={s.is_goldman ? "" : "text-text-dim"}
+                  style={s.is_goldman ? { color: "var(--gs)", fontWeight: 600 } : undefined}
+                >
+                  {s.fund_ticker}
+                  {s.is_goldman ? " ★" : ""}
+                </div>
+                <div className="mt-0.5 tabular-nums text-text">
+                  {(last.mark_pct as number).toFixed(1)}
+                  {reviewFlag ? (
+                    <span className="ml-1" style={{ color: "var(--amber)" }} title="flagged for review">
+                      ⚑
+                    </span>
+                  ) : null}
+                </div>
+                {last.delta_bps !== null && Number.isFinite(last.delta_bps) ? (
+                  <div
+                    className="text-[10.5px] tabular-nums"
+                    style={{
+                      color:
+                        (last.delta_bps as number) <= -100
+                          ? "var(--red)"
+                          : (last.delta_bps as number) <= -25
+                            ? "var(--amber)"
+                            : (last.delta_bps as number) >= 25
+                              ? "var(--green)"
+                              : "var(--text-dim)",
+                    }}
+                  >
+                    {(last.delta_bps as number) > 0 ? "+" : (last.delta_bps as number) < 0 ? "−" : ""}
+                    {Math.abs(last.delta_bps as number).toFixed(0)} bps today
+                  </div>
+                ) : null}
+              </div>
+            </div>
+          )
+        })}
       </div>
     </div>
   )

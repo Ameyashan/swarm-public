@@ -19,6 +19,20 @@ function fmtChange(n: number | null): string {
   return `${sign}${Math.abs(n).toFixed(1)}%`
 }
 
+function fmtBps(n: number | null): string {
+  if (n === null || !Number.isFinite(n)) return "—"
+  const sign = n > 0 ? "+" : n < 0 ? "−" : ""
+  return `${sign}${Math.abs(n).toFixed(0)} bps`
+}
+
+function bpsColor(n: number | null): string {
+  if (n === null) return "var(--text-dim)"
+  if (n <= -100) return "var(--red)"
+  if (n <= -25) return "var(--amber)"
+  if (n >= 25) return "var(--green)"
+  return "var(--text-dim)"
+}
+
 function changeColor(n: number | null): string {
   if (n === null) return "var(--text-dim)"
   if (n <= -25) return "var(--red)"
@@ -70,6 +84,7 @@ type SortKey =
   | "vintage"
   | "prior_fv"
   | "current_fv"
+  | "today_mark"
   | "fv_change_pct"
   | "accrual"
 type SortDir = "asc" | "desc" | null
@@ -88,6 +103,8 @@ function valueFor(row: BookPositionRow, key: SortKey): number | string | null {
       return row.prior_fv
     case "current_fv":
       return row.current_fv
+    case "today_mark":
+      return row.today_mark_pct
     case "fv_change_pct":
       return row.fv_change_pct
     case "accrual":
@@ -310,6 +327,13 @@ export function PositionsTable({
                       onClick={() => handleSort("current_fv")}
                     />
                     <SortHeader
+                      label="today’s mark"
+                      align="right"
+                      active={sort.key === "today_mark"}
+                      dir={sort.key === "today_mark" ? sort.dir : null}
+                      onClick={() => handleSort("today_mark")}
+                    />
+                    <SortHeader
                       label="change"
                       align="right"
                       active={sort.key === "fv_change_pct"}
@@ -338,6 +362,7 @@ export function PositionsTable({
                     <th className="px-3 py-2 text-left">vintage</th>
                     <th className="px-3 py-2 text-right">prior FV</th>
                     <th className="px-3 py-2 text-right">current FV</th>
+                    <th className="px-3 py-2 text-right">today’s mark</th>
                     <th className="px-3 py-2 text-right">change</th>
                     <th className="px-3 py-2 text-left">accrual</th>
                     <th className="px-5 py-2 text-left">filing</th>
@@ -392,6 +417,32 @@ export function PositionsTable({
                       </td>
                       <td className="px-3 py-3 align-top text-right font-mono text-[11.5px] tabular-nums text-text">
                         {fmtFv(r.current_fv)}
+                      </td>
+                      <td className="px-3 py-3 align-top text-right font-mono text-[11.5px] tabular-nums">
+                        {r.today_mark_pct === null || !Number.isFinite(r.today_mark_pct) ? (
+                          <span className="text-text-faint">—</span>
+                        ) : (
+                          <>
+                            <div className="text-text">
+                              {r.today_mark_pct.toFixed(1)}
+                              {r.today_requires_review ? (
+                                <span
+                                  className="ml-1 text-[10px]"
+                                  style={{ color: "var(--amber)" }}
+                                  title="requires review"
+                                >
+                                  ⚑
+                                </span>
+                              ) : null}
+                            </div>
+                            <div
+                              className="mt-0.5 text-[10.5px]"
+                              style={{ color: bpsColor(r.today_delta_bps) }}
+                            >
+                              {fmtBps(r.today_delta_bps)}
+                            </div>
+                          </>
+                        )}
                       </td>
                       <td
                         className="px-3 py-3 align-top text-right font-mono text-[11.5px] font-medium tabular-nums"
