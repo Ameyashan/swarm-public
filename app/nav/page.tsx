@@ -2,6 +2,7 @@ import type { Metadata } from "next"
 import {
   getBacktestRuns,
   getCurrentMethodology,
+  getDailyMarkHistoryByBorrower,
   getDailyMarks,
   getLatestMarkDate,
   getOverridesForRows,
@@ -43,10 +44,11 @@ export default async function NavPage({ searchParams }: { searchParams: SearchPa
     getBacktestRuns(fund, 6),
   ])
   const tunedVersion = methodology?.version ?? "v1.1.0"
-  const [rows, overrides, tunedIndustries] = await Promise.all([
+  const [rows, overrides, tunedIndustries, historyByBorrower] = await Promise.all([
     getDailyMarks(fund, latestDate),
     getOverridesForRows(fund, latestDate),
     getTunedIndustries(tunedVersion),
+    getDailyMarkHistoryByBorrower(fund, 30),
   ])
   const summary = summarize(rows)
 
@@ -84,7 +86,11 @@ export default async function NavPage({ searchParams }: { searchParams: SearchPa
         <EmptyState fund={fund} />
       ) : (
         <>
-          <DailyMarksTable rows={rows} overrides={overrides} />
+          <DailyMarksTable
+            rows={rows}
+            overrides={overrides}
+            historyByBorrower={historyByBorrower}
+          />
           <ReviewQueue rows={rows} />
         </>
       )}

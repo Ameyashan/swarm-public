@@ -2,8 +2,62 @@
 
 import { useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
-import type { DailyMarkRow, MarkOverrideRow } from "@/lib/nav/queries"
+import type {
+  DailyMarkHistoryPoint,
+  DailyMarkRow,
+  MarkOverrideRow,
+} from "@/lib/nav/queries"
 import { MethodologyDrawer } from "@/components/nav/methodology-drawer"
+
+// Compact per-row sparkline of the last N daily marks. Fixed dimensions so
+// the column stays narrow and rows align. Points missing mark_pct are dropped.
+function HistorySpark({ points }: { points: DailyMarkHistoryPoint[] }) {
+  const W = 64
+  const H = 22
+  const valid = points.filter(
+    (p) => p.mark_pct !== null && Number.isFinite(p.mark_pct),
+  )
+  if (valid.length < 2) {
+    return (
+      <span className="font-mono text-[10px] text-text-faint">
+        {valid.length === 1 ? "1 mark" : "no history"}
+      </span>
+    )
+  }
+  const marks = valid.map((p) => p.mark_pct as number)
+  const yMin = Math.min(...marks)
+  const yMax = Math.max(...marks)
+  const span = Math.max(0.1, yMax - yMin)
+  const xFor = (i: number) =>
+    valid.length === 1 ? W / 2 : (i / (valid.length - 1)) * W
+  const yFor = (m: number) => H - ((m - yMin) / span) * H
+  const d = valid
+    .map((p, i) => {
+      const x = xFor(i)
+      const y = yFor(p.mark_pct as number)
+      return `${i === 0 ? "M" : "L"} ${x.toFixed(1)} ${y.toFixed(1)}`
+    })
+    .join(" ")
+  const last = valid[valid.length - 1]
+  const first = valid[0]
+  const drift =
+    first.mark_pct && Number.isFinite(first.mark_pct)
+      ? (last.mark_pct as number) - (first.mark_pct as number)
+      : 0
+  const stroke = drift < -0.5 ? "var(--red)" : drift > 0.5 ? "var(--green)" : "var(--gs)"
+  return (
+    <svg
+      viewBox={`0 0 ${W} ${H}`}
+      width={W}
+      height={H}
+      role="img"
+      aria-label={`${valid.length}-day mark trajectory`}
+    >
+      <path d={d} fill="none" stroke={stroke} strokeWidth={1.4} />
+      <circle cx={xFor(valid.length - 1)} cy={yFor(last.mark_pct as number)} r={1.8} fill={stroke} />
+    </svg>
+  )
+}
 
 function fmtFv(thousands: number | null): string {
   if (thousands === null || !Number.isFinite(thousands)) return "—"
@@ -72,9 +126,11 @@ type SortDir = "asc" | "desc"
 export function DailyMarksTable({
   rows,
   overrides,
+  historyByBorrower,
 }: {
   rows: DailyMarkRow[]
   overrides: MarkOverrideRow[]
+  historyByBorrower?: Map<string, DailyMarkHistoryPoint[]>
 }) {
   const router = useRouter()
   const [filter, setFilter] = useState<"all" | "review" | "down" | "up">("all")
@@ -170,6 +226,9 @@ export function DailyMarksTable({
               <th scope="col" className="px-3 py-2 text-left font-mono text-[10.5px] uppercase tracking-[0.1em]" style={{ color: "var(--text-faint)" }}>
                 pillars
               </th>
+              <th scope="col" className="px-3 py-2 text-left font-mono text-[10.5px] uppercase tracking-[0.1em]" style={{ color: "var(--text-faint)" }}>
+                30d trail
+              </th>
               <HeaderCell k="fair_value" label="today FV" align="right" />
               <HeaderCell k="delta_bps" label="Δ bps" align="right" />
               <HeaderCell k="mark_pct" label="mark %" align="right" />
@@ -204,6 +263,11 @@ export function DailyMarksTable({
                     </div>
                   </td>
                   <td className="px-3 py-2"><PillarBar row={r} /></td>
+                  <td className="px-3 py-2">
+                    <HistorySpark
+                      points={historyByBorrower?.get(r.portfolio_company_canonical) ?? []}
+                    />
+                  </td>
                   <td className="px-3 py-2 text-right font-mono text-[12.5px] tabular-nums">
                     {fmtFv(r.fair_value_estimated)}
                   </td>
@@ -238,7 +302,7 @@ export function DailyMarksTable({
             })}
             {filtered.length === 0 && (
               <tr>
-                <td colSpan={7} className="px-3 py-6 text-center font-mono text-[11.5px] text-text-faint">
+                <td colSpan={8} className="px-3 py-6 text-center font-mono text-[11.5px] text-text-faint">
                   no rows match this filter
                 </td>
               </tr>
