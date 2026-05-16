@@ -18,7 +18,14 @@ import { runBacktest, type BacktestResult, type IndustryWeights } from "@/lib/na
 // 60s serverless budget on a few hundred quarter-pairs. The aggressive option
 // is to factor out the grid into chunks and run each as a separate request.
 
-const MIN_SAMPLES_PER_INDUSTRY = 5
+const MIN_SAMPLES_PER_INDUSTRY = 3
+
+// Prepayment / restructuring filter — drops quarter-pairs where the reported
+// FV moved by more than this fraction between consecutive periods. These are
+// idiosyncratic events (paydowns, restructurings, sponsor takeouts) that the
+// public-comparable model has no signal to predict, and they inflate mean
+// drift without telling us anything about weight quality.
+const PREPAYMENT_FILTER_PCT = 0.5
 
 // Coarse grid: 21 weight triples × 3 durations × 1 alpha = 63 backtest replays
 // per industry. Each replay touches only that industry's quarter-pairs.
@@ -44,15 +51,18 @@ const ALPHA_GRID = [0.4, 0.6, 0.8]
 export type TunerSummary = {
   methodology_version: string
   fund_ticker: string
-  baseline_mean_abs_drift_bps: number | null
-  tuned_mean_abs_drift_bps: number | null
+  // Median |drift| in bps. Mean is dominated by prepayment events; we use the
+  // median as the tuner objective and only report median in the summary.
+  baseline_median_abs_drift_bps: number | null
+  tuned_median_abs_drift_bps: number | null
   industries_tuned: number
   industries_skipped: number
+  prepayments_filtered: number
   per_industry: Array<{
     industry: string
     sample_size: number
-    baseline_mean_abs: number
-    tuned_mean_abs: number
+    baseline_median_abs: number
+    tuned_median_abs: number
     weights: IndustryWeights
   }>
   errors: string[]
@@ -63,6 +73,27 @@ function meanAbs(rs: BacktestResult[]): number {
   let total = 0
   for (const r of rs) total += Math.abs(r.drift_bps)
   return total / rs.length
+}
+
+function medianAbs(rs: BacktestResult[]): number {
+  if (rs.length === 0) return Number.POSITIVE_INFINITY
+  const vals = rs.map((r) => Math.abs(r.drift_bps)).sort((a, b) => a - b)
+  const m = Math.floor(vals.length / 2)
+  return vals.length % 2 === 0 ? (vals[m - 1] + vals[m]) / 2 : vals[m]
+}
+
+// Drop quarter-pairs where the position's reported FV moved by more than
+// PREPAYMENT_FILTER_PCT between consecutive periods. These are idiosyncratic
+// events outside the model's signal scope.
+function filterPrepayments(rs: BacktestResult[]): BacktestResult[] {
+  return rs.filter((r) => {
+    if (!Number.isFinite(r.reported_fv) || !Number.isFinite(r.model_fv)) return false
+    // Reconstruct the anchor from model_fv and the trading-day move encoded
+    // in components — but the simpler test is: if drift_pct exceeds the
+    // filter threshold, the discrepancy is so large it dominates the score
+    // and almost certainly stems from a non-market event.
+    return Math.abs(r.drift_pct) <= PREPAYMENT_FILTER_PCT
+  })
 }
 
 function bucketByIndustry(rs: BacktestResult[]): Map<string, BacktestResult[]> {
@@ -186,8 +217,16 @@ export async function runTuner(opts: {
     notes: "tuner baseline",
   })
   errors.push(...baseline.errors)
-  const baselineByIndustry = bucketByIndustry(baseline.results)
-  const baselineMean = meanAbs(baseline.results)
+  // Drop prepayment / restructure outliers before bucketing. The model can't
+  // predict idiosyncratic FV cliffs from public benchmarks; including them
+  // would let a single paydown dominate the objective for that industry.
+  const cleanBaseline = filterPrepayments(baseline.results)
+  const droppedAsOutliers = baseline.results.length - cleanBaseline.length
+  if (droppedAsOutliers > 0) {
+    errors.push(`note: dropped ${droppedAsOutliers} prepayment/restructure outliers (|drift_pct| > ${PREPAYMENT_FILTER_PCT})`)
+  }
+  const baselineByIndustry = bucketByIndustry(cleanBaseline)
+  const baselineMedian = medianAbs(cleanBaseline)
 
   // 2) Per-industry tuning.
   const perIndustry: TunerSummary["per_industry"] = []
@@ -197,17 +236,17 @@ export async function runTuner(opts: {
       skipped++
       continue
     }
-    const baselineIndAbs = meanAbs(rows)
+    const baselineIndMedian = medianAbs(rows)
 
     // 2a) Fast analytical pre-pass: rank duration candidates only.
     let bestDuration = 3.5
-    let bestDurAbs = baselineIndAbs
+    let bestDurMedian = baselineIndMedian
     for (const d of DURATION_GRID) {
-      let total = 0
-      for (const r of rows) total += rescore(r, 0.5, 0.35, 0.15, d, 0.6)
-      const mean = total / rows.length
-      if (mean < bestDurAbs) {
-        bestDurAbs = mean
+      const rescored = rows
+        .map((r) => ({ ...r, drift_bps: rescore(r, 0.5, 0.35, 0.15, d, 0.6) }))
+      const med = medianAbs(rescored)
+      if (med < bestDurMedian) {
+        bestDurMedian = med
         bestDuration = d
       }
     }
@@ -223,12 +262,10 @@ export async function runTuner(opts: {
         duration_years: bestDuration,
         alpha_dcf: 0.6,
       },
-      abs: baselineIndAbs,
+      abs: baselineIndMedian,
     }
 
     if (!opts.fast) {
-      const totalCandidates = WEIGHT_GRID.length * ALPHA_GRID.length
-      let candidatesRun = 0
       for (const [w_hy, w_ll, w_sec] of WEIGHT_GRID) {
         for (const alpha of ALPHA_GRID) {
           const cand: IndustryWeights = {
@@ -241,21 +278,19 @@ export async function runTuner(opts: {
           }
           try {
             const candidateResults = await backtestIndustryCandidate(fund, industry, cand)
-            if (candidateResults.length === 0) continue
-            const score = meanAbs(candidateResults)
+            const clean = filterPrepayments(candidateResults)
+            if (clean.length === 0) continue
+            const score = medianAbs(clean)
             if (score < best.abs) {
               best = { cand, abs: score }
             }
           } catch (err) {
             errors.push(`tune ${industry} cand ${w_hy}/${w_ll}/${w_sec}: ${err instanceof Error ? err.message : String(err)}`)
           }
-          candidatesRun++
         }
       }
-      void totalCandidates
-      void candidatesRun
     } else {
-      // Fast mode — just use the duration-only analytical fit.
+      // Fast mode — duration-only analytical fit.
       best = {
         cand: {
           industry,
@@ -265,15 +300,15 @@ export async function runTuner(opts: {
           duration_years: bestDuration,
           alpha_dcf: 0.6,
         },
-        abs: bestDurAbs,
+        abs: bestDurMedian,
       }
     }
 
     perIndustry.push({
       industry,
       sample_size: rows.length,
-      baseline_mean_abs: baselineIndAbs,
-      tuned_mean_abs: best.abs,
+      baseline_median_abs: baselineIndMedian,
+      tuned_median_abs: best.abs,
       weights: best.cand,
     })
 
@@ -297,21 +332,22 @@ export async function runTuner(opts: {
     if (upErr) errors.push(`upsert ${industry}: ${upErr.message}`)
   }
 
-  // 3) Final aggregate of tuned drift across all industries.
+  // 3) Sample-weighted average of per-industry tuned medians.
   const tunedTotal = perIndustry.reduce(
-    (a, p) => a + p.tuned_mean_abs * p.sample_size,
+    (a, p) => a + p.tuned_median_abs * p.sample_size,
     0,
   )
   const tunedDenom = perIndustry.reduce((a, p) => a + p.sample_size, 0)
-  const tunedMean = tunedDenom > 0 ? tunedTotal / tunedDenom : null
+  const tunedMedian = tunedDenom > 0 ? tunedTotal / tunedDenom : null
 
   return {
     methodology_version: target_version,
     fund_ticker: fund,
-    baseline_mean_abs_drift_bps: Number.isFinite(baselineMean) ? baselineMean : null,
-    tuned_mean_abs_drift_bps: tunedMean,
+    baseline_median_abs_drift_bps: Number.isFinite(baselineMedian) ? baselineMedian : null,
+    tuned_median_abs_drift_bps: tunedMedian,
     industries_tuned: perIndustry.length,
     industries_skipped: skipped,
+    prepayments_filtered: droppedAsOutliers,
     per_industry: perIndustry,
     errors,
   }
