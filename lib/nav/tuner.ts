@@ -325,6 +325,7 @@ export async function runTuner(opts: {
           duration_years: best.cand.duration_years,
           alpha_dcf: best.cand.alpha_dcf,
           fit_mean_abs_drift_bps: best.abs,
+          tuned_minus_baseline_bps: best.abs - baselineIndMedian,
           sample_size: rows.length,
         },
         { onConflict: "methodology_version,industry" },
