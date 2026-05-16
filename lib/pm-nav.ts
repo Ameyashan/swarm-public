@@ -12,6 +12,7 @@ export type PmNavLink = {
 
 export const PM_NAV: PmNavLink[] = [
   { href: "/", label: "Briefing", match: "/" },
+  { href: "/nav", label: "Daily NAV", match: "/nav" },
   { href: "/book", label: "Position book", match: "/book" },
   // Use the exact canonical name as it appears in observations
   // (`MRI Software LLC`). The borrower x-ray does an `.eq()` lookup against
