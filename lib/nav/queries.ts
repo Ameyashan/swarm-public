@@ -18,6 +18,19 @@ export type DailyMarkRow = {
   created_at: string
 }
 
+export type MarkOverrideRow = {
+  id: string
+  fund_ticker: string
+  portfolio_company_canonical: string
+  override_date: string
+  original_mark: number
+  override_mark: number
+  reason: string
+  approver: string | null
+  status: "pending" | "approved" | "rejected"
+  created_at: string
+}
+
 export type MethodologyVersion = {
   version: string
   effective_at: string
@@ -101,6 +114,66 @@ export function summarize(rows: DailyMarkRow[]): DailyMarksSummary {
     review_count,
   }
 }
+
+// Fetch overrides for the rows currently on screen (keyed by fund + borrower
+// + mark_date). We only need rows whose override_date matches the mark_date.
+export const getOverridesForRows = cache(
+  async (fund: string, mark_date: string | null): Promise<MarkOverrideRow[]> => {
+    if (!mark_date) return []
+    const supabase = createClient()
+    const { data, error } = await supabase
+      .from("mark_overrides")
+      .select(
+        "id, fund_ticker, portfolio_company_canonical, override_date, original_mark, override_mark, reason, approver, status, created_at",
+      )
+      .eq("fund_ticker", fund)
+      .eq("override_date", mark_date)
+      .order("created_at", { ascending: false })
+    if (error) return []
+    return (data ?? []) as MarkOverrideRow[]
+  },
+)
+
+export type BiggestMover = {
+  id: string
+  fund_ticker: string
+  portfolio_company_canonical: string
+  mark_date: string
+  mark_pct: number | null
+  delta_bps: number
+  fair_value_estimated: number
+  requires_review: boolean
+}
+
+// Top movers across both funds on the latest available mark_date. Used by the
+// Briefing "biggest daily movers" tile. Includes the most negative AND most
+// positive deltas (no symmetry assumed — most often the bottom dominates).
+export const getBiggestMovers = cache(
+  async (limit: number = 5): Promise<BiggestMover[]> => {
+    const supabase = createClient()
+    const { data: latest, error: latestErr } = await supabase
+      .from("daily_marks")
+      .select("mark_date")
+      .order("mark_date", { ascending: false })
+      .limit(1)
+    if (latestErr || !latest || latest.length === 0) return []
+    const latestDate = latest[0].mark_date as string
+    const { data, error } = await supabase
+      .from("daily_marks")
+      .select(
+        "id, fund_ticker, portfolio_company_canonical, mark_date, mark_pct, delta_bps, fair_value_estimated, requires_review",
+      )
+      .eq("mark_date", latestDate)
+      .not("delta_bps", "is", null)
+      .limit(2000)
+    if (error || !data) return []
+    const rows = (data as BiggestMover[]).filter((r) =>
+      Number.isFinite(Number(r.delta_bps)),
+    )
+    rows.sort((a, b) => Math.abs(Number(b.delta_bps)) - Math.abs(Number(a.delta_bps)))
+    return rows.slice(0, limit)
+  },
+)
 
 export const getCurrentMethodology = cache(async (): Promise<MethodologyVersion | null> => {
   const supabase = createClient()

@@ -3,6 +3,7 @@ import {
   getCurrentMethodology,
   getDailyMarks,
   getLatestMarkDate,
+  getOverridesForRows,
   summarize,
 } from "@/lib/nav/queries"
 import { getReconciliationStats } from "@/lib/nav/reconcile"
@@ -36,7 +37,10 @@ export default async function NavPage({ searchParams }: { searchParams: SearchPa
     getCurrentMethodology(),
     getReconciliationStats(fund),
   ])
-  const rows = await getDailyMarks(fund, latestDate)
+  const [rows, overrides] = await Promise.all([
+    getDailyMarks(fund, latestDate),
+    getOverridesForRows(fund, latestDate),
+  ])
   const summary = summarize(rows)
 
   return (
@@ -69,7 +73,7 @@ export default async function NavPage({ searchParams }: { searchParams: SearchPa
         <EmptyState fund={fund} />
       ) : (
         <>
-          <DailyMarksTable rows={rows} />
+          <DailyMarksTable rows={rows} overrides={overrides} />
           <ReviewQueue rows={rows} />
         </>
       )}

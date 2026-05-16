@@ -1,7 +1,8 @@
 "use client"
 
 import { useMemo, useState } from "react"
-import type { DailyMarkRow } from "@/lib/nav/queries"
+import { useRouter } from "next/navigation"
+import type { DailyMarkRow, MarkOverrideRow } from "@/lib/nav/queries"
 import { MethodologyDrawer } from "@/components/nav/methodology-drawer"
 
 function fmtFv(thousands: number | null): string {
@@ -68,11 +69,27 @@ function PillarBar({ row }: { row: DailyMarkRow }) {
 type SortKey = "delta_bps" | "borrower" | "fair_value" | "mark_pct" | "confidence"
 type SortDir = "asc" | "desc"
 
-export function DailyMarksTable({ rows }: { rows: DailyMarkRow[] }) {
+export function DailyMarksTable({
+  rows,
+  overrides,
+}: {
+  rows: DailyMarkRow[]
+  overrides: MarkOverrideRow[]
+}) {
+  const router = useRouter()
   const [filter, setFilter] = useState<"all" | "review" | "down" | "up">("all")
   const [sortKey, setSortKey] = useState<SortKey>("delta_bps")
   const [sortDir, setSortDir] = useState<SortDir>("asc")
   const [active, setActive] = useState<DailyMarkRow | null>(null)
+
+  const overrideCountByKey = useMemo(() => {
+    const m = new Map<string, number>()
+    for (const o of overrides) {
+      const k = `${o.fund_ticker}::${o.portfolio_company_canonical}::${o.override_date}`
+      m.set(k, (m.get(k) ?? 0) + 1)
+    }
+    return m
+  }, [overrides])
 
   const filtered = useMemo(() => {
     let out = rows
@@ -165,6 +182,9 @@ export function DailyMarksTable({ rows }: { rows: DailyMarkRow[] }) {
           <tbody>
             {filtered.map((r) => {
               const conf = confidenceBadge(r.confidence)
+              const overrideCount = overrideCountByKey.get(
+                `${r.fund_ticker}::${r.portfolio_company_canonical}::${r.mark_date}`,
+              ) ?? 0
               return (
                 <tr
                   key={r.id}
@@ -176,6 +196,11 @@ export function DailyMarksTable({ rows }: { rows: DailyMarkRow[] }) {
                     {r.portfolio_company_canonical}
                     <div className="font-mono text-[10.5px] text-text-faint">
                       {r.methodology_version}
+                      {overrideCount > 0 ? (
+                        <span className="ml-2" style={{ color: "var(--accent)" }}>
+                          {overrideCount} override{overrideCount === 1 ? "" : "s"}
+                        </span>
+                      ) : null}
                     </div>
                   </td>
                   <td className="px-3 py-2"><PillarBar row={r} /></td>
@@ -222,7 +247,12 @@ export function DailyMarksTable({ rows }: { rows: DailyMarkRow[] }) {
         </table>
       </div>
 
-      <MethodologyDrawer row={active} onClose={() => setActive(null)} />
+      <MethodologyDrawer
+        row={active}
+        overrides={overrides}
+        onClose={() => setActive(null)}
+        onOverrideChange={() => router.refresh()}
+      />
     </section>
   )
 }

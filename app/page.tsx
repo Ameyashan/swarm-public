@@ -21,6 +21,8 @@ import { WhatChangedGrid } from "@/components/briefing/what-changed"
 import { ForwardSignals, type BacktestStat } from "@/components/briefing/forward-signals"
 import { CommitteeQuestions } from "@/components/briefing/committee-questions"
 import { PeerRankPanel } from "@/components/briefing/peer-rank"
+import { DailyMovers } from "@/components/briefing/daily-movers"
+import { getBiggestMovers } from "@/lib/nav/queries"
 
 // Server-rendered with revalidation so per-request Supabase load stays
 // bounded. Briefing is read-only.
@@ -76,7 +78,7 @@ function computeMarkVariance(
 
 export default async function BriefingPage() {
   // Fan out reads in parallel.
-  const [topHits, recentHits, enrichEvents, peerStats, backtest, hitUniverse] =
+  const [topHits, recentHits, enrichEvents, peerStats, backtest, hitUniverse, dailyMovers] =
     await Promise.all([
       getTopGoldmanHits(12),
       getRecentGoldmanHits(40),
@@ -85,6 +87,7 @@ export default async function BriefingPage() {
       getLitigationBacktest(),
       // Reuse the broader hit pull for the mark-variance approximation.
       getRecentGoldmanHits(200),
+      getBiggestMovers(5),
     ])
 
   // Combine top + recent so the editorial paragraph has both perspectives.
@@ -138,6 +141,8 @@ export default async function BriefingPage() {
       <EditorialHeadlineBlock headline={headline} />
 
       <WhatChangedGrid cards={cards} />
+
+      <DailyMovers rows={dailyMovers} />
 
       <ForwardSignals signals={signalRows} backtest={backtestStat} />
 
