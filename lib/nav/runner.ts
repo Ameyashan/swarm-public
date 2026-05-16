@@ -33,6 +33,17 @@ type PositionAnchor = {
   fair_value: number | null
   cost: number | null
   period_end: string | null
+  industry_canonical: string | null
+  industry: string | null
+}
+
+type IndustryWeightRow = {
+  industry: string
+  w_hy: number
+  w_ll: number
+  w_sec: number
+  duration_years: number
+  alpha_dcf: number
 }
 
 type IdioHit = {
@@ -82,14 +93,16 @@ function daysBetween(iso: string | null, ref: string): number | null {
 export async function runDailyMarks(opts: {
   fund?: string
   dryRun?: boolean
+  methodology_version?: string
 } = {}): Promise<RunSummary> {
   const fund = opts.fund ?? "GSCR"
   const dryRun = opts.dryRun ?? false
+  const methodology_version = opts.methodology_version ?? METHODOLOGY_VERSION
   const supabase = createAdminClient()
   const mark_date = nyTradingDate()
 
   const summary: RunSummary = {
-    methodology_version: METHODOLOGY_VERSION,
+    methodology_version,
     mark_date,
     benchmark_count: 0,
     benchmark_errors: [],
@@ -136,6 +149,18 @@ export async function runDailyMarks(opts: {
   const snapsByCode = new Map<string, FetchedPair>()
   for (const p of fetched.ok) snapsByCode.set(p.series_code, p)
 
+  // ───────────── Load per-industry overrides for this methodology_version ──
+  const industryOverrides = new Map<string, IndustryWeightRow>()
+  {
+    const { data: ovRows } = await supabase
+      .from("methodology_industry_weights")
+      .select("industry, w_hy, w_ll, w_sec, duration_years, alpha_dcf")
+      .eq("methodology_version", methodology_version)
+    for (const r of (ovRows ?? []) as IndustryWeightRow[]) {
+      industryOverrides.set(r.industry.toLowerCase().trim(), r)
+    }
+  }
+
   // ───────────── Load anchor FV (latest observation) per position ──────────
   const positionKeys = Array.from(
     new Set(map.map((r) => `${r.fund_ticker}::${r.portfolio_company_canonical}`)),
@@ -148,7 +173,9 @@ export async function runDailyMarks(opts: {
   // 4 quarters and pick the max period_end per key client-side.
   const { data: obsRows, error: obsErr } = await supabase
     .from("observations")
-    .select("fund_ticker, portfolio_company_canonical, period_end, fair_value, cost")
+    .select(
+      "fund_ticker, portfolio_company_canonical, period_end, fair_value, cost, industry_canonical, industry",
+    )
     .eq("fund_ticker", fund)
     .in("portfolio_company_canonical", borrowers)
     .order("period_end", { ascending: false })
@@ -232,12 +259,28 @@ export async function runDailyMarks(opts: {
     const priorEntry = priorByKey.get(key)
     const priorFv = priorEntry ? Number(priorEntry.fair_value_estimated) : anchorFv
 
-    const weights: BenchmarkWeight[] = rows.map((r) => ({
-      benchmark_code: r.benchmark_code,
-      weight: Number(r.weight),
-    }))
-    const benchmarks: BenchmarkSnapshot[] = rows
-      .map((r) => snapsByCode.get(r.benchmark_code))
+    // Apply per-industry override when one exists for this borrower's
+    // industry under the active methodology_version. Falls back to the
+    // baseline position_benchmark_map row otherwise.
+    const industryKey = (anchor.industry_canonical ?? anchor.industry ?? "")
+      .toLowerCase()
+      .trim()
+    const override = industryKey ? industryOverrides.get(industryKey) : undefined
+    const weights: BenchmarkWeight[] = override
+      ? [
+          { benchmark_code: "BAMLH0A0HYM2", weight: override.w_hy },
+          { benchmark_code: "BKLN", weight: override.w_ll },
+          // sector ETF: whatever the map already picked, reweighted.
+          ...rows
+            .filter((r) => !["BAMLH0A0HYM2", "BKLN"].includes(r.benchmark_code))
+            .map((r) => ({ benchmark_code: r.benchmark_code, weight: override.w_sec })),
+        ]
+      : rows.map((r) => ({
+          benchmark_code: r.benchmark_code,
+          weight: Number(r.weight),
+        }))
+    const benchmarks: BenchmarkSnapshot[] = weights
+      .map((w) => snapsByCode.get(w.benchmark_code))
       .filter((p): p is FetchedPair => Boolean(p))
       .map((p) => ({
         series_code: p.series_code,
@@ -246,8 +289,8 @@ export async function runDailyMarks(opts: {
         kind: classifyKind(p.series_code),
       }))
 
-    const duration = Number(rows[0].duration_years)
-    const alpha = Number(rows[0].alpha_dcf)
+    const duration = override ? override.duration_years : Number(rows[0].duration_years)
+    const alpha = override ? override.alpha_dcf : Number(rows[0].alpha_dcf)
     const idio = idioByBorrower.get(borrower) ?? { latest_severity_100: null }
 
     const result: DailyMarkResult = computeDailyMark({
@@ -274,8 +317,12 @@ export async function runDailyMarks(opts: {
       mark_pct,
       prior_fv: priorFv,
       delta_bps: result.delta_bps,
-      methodology_version: result.components.methodology_version,
-      components: result.components as unknown as Record<string, any>,
+      methodology_version,
+      components: {
+        ...(result.components as unknown as Record<string, any>),
+        industry_override_applied: Boolean(override),
+        industry_key: industryKey || null,
+      },
       confidence: result.confidence,
       requires_review: result.requires_review,
     })
@@ -307,7 +354,7 @@ export async function runDailyMarks(opts: {
   // model mark at-or-before its period_end gets persisted as drift in bps.
   // Failures here are non-fatal; the daily marks are already written.
   try {
-    const reco = await runReconciliation({ fund, methodology_version: METHODOLOGY_VERSION })
+    const reco = await runReconciliation({ fund, methodology_version })
     summary.reconciliation_inserted = reco.rows_inserted
     if (reco.errors.length) summary.errors.push(...reco.errors.map((e) => `reconcile: ${e}`))
   } catch (err) {

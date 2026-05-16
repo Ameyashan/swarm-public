@@ -145,3 +145,67 @@ test("components JSONB carries all inputs for reproducibility", () => {
     assert.ok(typeof t.value_prior === "number")
   }
 })
+
+test("alternate weights (industry-override style) produce different blended spread", () => {
+  // Baseline: HY 0.50 / LL 0.35 / Sec 0.15
+  // Override: HY 0.20 / LL 0.50 / Sec 0.30 — software-tilted, less HY-driven
+  const movedHy = {
+    series_code: "BAMLH0A0HYM2",
+    value_today: 7.60,
+    value_prior: 7.50,
+    kind: "yield" as const,
+  }
+  const flat = (code: string) => ({
+    series_code: code,
+    value_today: 100,
+    value_prior: 100,
+    kind: "price" as const,
+  })
+  const baseline = computeDailyMark(
+    baseInput({
+      weights: [
+        { benchmark_code: "BAMLH0A0HYM2", weight: 0.5 },
+        { benchmark_code: "BKLN", weight: 0.35 },
+        { benchmark_code: "XLK", weight: 0.15 },
+      ],
+      benchmarks: [movedHy, flat("BKLN"), flat("XLK")],
+    }),
+  )
+  const tilted = computeDailyMark(
+    baseInput({
+      weights: [
+        { benchmark_code: "BAMLH0A0HYM2", weight: 0.20 },
+        { benchmark_code: "BKLN", weight: 0.50 },
+        { benchmark_code: "XLK", weight: 0.30 },
+      ],
+      benchmarks: [movedHy, flat("BKLN"), flat("XLK")],
+    }),
+  )
+  // Pillar B contribution: HY-tilted baseline → 0.5×10 = 5 bps
+  //                        software-tilted    → 0.2×10 = 2 bps
+  assert.ok(baseline.components.pillar_b_spread_delta_bps > tilted.components.pillar_b_spread_delta_bps)
+  // FV should move less under the software-tilted weights.
+  assert.ok(baseline.fair_value_estimated < tilted.fair_value_estimated)
+})
+
+test("longer duration amplifies the FV move under the same spread delta", () => {
+  const moved = {
+    series_code: "BAMLH0A0HYM2",
+    value_today: 7.60,
+    value_prior: 7.50,
+    kind: "yield" as const,
+  }
+  const flat = (c: string) => ({ series_code: c, value_today: 100, value_prior: 100, kind: "price" as const })
+  const shortDur = computeDailyMark(baseInput({
+    duration_years: 2.0,
+    benchmarks: [moved, flat("BKLN"), flat("XLK")],
+  }))
+  const longDur = computeDailyMark(baseInput({
+    duration_years: 5.0,
+    benchmarks: [moved, flat("BKLN"), flat("XLK")],
+  }))
+  // Both move negatively. Longer duration → larger absolute FV change.
+  const shortMove = Math.abs(shortDur.fair_value_estimated - 10_000)
+  const longMove = Math.abs(longDur.fair_value_estimated - 10_000)
+  assert.ok(longMove > shortMove)
+})
