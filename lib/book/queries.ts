@@ -45,6 +45,13 @@ export type BookPositionRow = {
   accrual_status: string | null
   is_pik: boolean | null
   detector_name: string
+  // Daily-NAV overlay (Phase 2). Null when no daily_marks row exists for the
+  // borrower within the last 7 calendar days.
+  today_mark_pct: number | null
+  today_fv_dollars: number | null
+  today_delta_bps: number | null
+  today_mark_date: string | null
+  today_requires_review: boolean
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -173,6 +180,11 @@ function rowFromHit(h: DetectorHitRow): BookPositionRow {
     accrual_status: accrual,
     is_pik: isPik,
     detector_name: h.detector_name,
+    today_mark_pct: null,
+    today_fv_dollars: null,
+    today_delta_bps: null,
+    today_mark_date: null,
+    today_requires_review: false,
   }
 }
 
@@ -380,6 +392,59 @@ export const getFundBookPositions = cache(
         const aCh = a.fv_change_pct ?? 0
         const bCh = b.fv_change_pct ?? 0
         if (bCh < aCh) byBorrower.set(key, b) // more negative wins
+      }
+    }
+
+    // Daily-NAV overlay: pull the latest daily_marks row per (fund, borrower)
+    // within the last 7 calendar days and splice into the deduped rows.
+    {
+      type DailyMarkRow = {
+        fund_ticker: string
+        portfolio_company_canonical: string
+        mark_date: string
+        fair_value_estimated: number
+        mark_pct: number | null
+        delta_bps: number | null
+        requires_review: boolean
+      }
+      const borrowers = Array.from(byBorrower.values())
+        .map((r) => r.borrower)
+        .filter((b): b is string => Boolean(b))
+      if (borrowers.length > 0) {
+        const sinceIso = new Date(Date.now() - 7 * 86_400_000)
+          .toISOString()
+          .slice(0, 10)
+        const { data: marks, error: marksErr } = await supabase
+          .from("daily_marks")
+          .select(
+            "fund_ticker, portfolio_company_canonical, mark_date, fair_value_estimated, mark_pct, delta_bps, requires_review",
+          )
+          .eq("fund_ticker", fund)
+          .in("portfolio_company_canonical", borrowers)
+          .gte("mark_date", sinceIso)
+          .order("mark_date", { ascending: false })
+          .limit(4000)
+        if (marksErr) {
+          console.error("getFundBookPositions daily_marks err", fund, marksErr)
+        } else {
+          const latestByBorrower = new Map<string, DailyMarkRow>()
+          for (const m of (marks ?? []) as DailyMarkRow[]) {
+            if (!latestByBorrower.has(m.portfolio_company_canonical)) {
+              latestByBorrower.set(m.portfolio_company_canonical, m)
+            }
+          }
+          for (const row of byBorrower.values()) {
+            if (!row.borrower) continue
+            const m = latestByBorrower.get(row.borrower)
+            if (!m) continue
+            row.today_mark_pct = m.mark_pct === null ? null : Number(m.mark_pct)
+            // daily_marks.fair_value_estimated is in thousands, like observations.
+            row.today_fv_dollars = Number(m.fair_value_estimated) * 1000
+            row.today_delta_bps = m.delta_bps === null ? null : Number(m.delta_bps)
+            row.today_mark_date = m.mark_date
+            row.today_requires_review = m.requires_review === true
+          }
+        }
       }
     }
 
