@@ -1,5 +1,6 @@
 import type { Metadata } from "next"
 import {
+  getBacktestRuns,
   getCurrentMethodology,
   getDailyMarks,
   getLatestMarkDate,
@@ -8,6 +9,7 @@ import {
 } from "@/lib/nav/queries"
 import { getReconciliationStats } from "@/lib/nav/reconcile"
 import { AccuracyCard } from "@/components/nav/accuracy-card"
+import { BacktestCard } from "@/components/nav/backtest-card"
 import { DailyMarksTable } from "@/components/nav/daily-marks-table"
 import { MoverTiles } from "@/components/nav/mover-tile"
 import { ReviewQueue } from "@/components/nav/review-queue"
@@ -32,10 +34,11 @@ export default async function NavPage({ searchParams }: { searchParams: SearchPa
   const explicitDate = searchParams.date && /^\d{4}-\d{2}-\d{2}$/.test(searchParams.date)
     ? searchParams.date
     : null
-  const [latestDate, methodology, accuracy] = await Promise.all([
+  const [latestDate, methodology, accuracy, backtestRuns] = await Promise.all([
     explicitDate ? Promise.resolve(explicitDate) : getLatestMarkDate(fund),
     getCurrentMethodology(),
     getReconciliationStats(fund),
+    getBacktestRuns(fund, 6),
   ])
   const [rows, overrides] = await Promise.all([
     getDailyMarks(fund, latestDate),
@@ -68,6 +71,8 @@ export default async function NavPage({ searchParams }: { searchParams: SearchPa
       <MoverTiles summary={summary} methodologyVersion={methodology?.version ?? null} />
 
       <AccuracyCard stats={accuracy} />
+
+      <BacktestCard runs={backtestRuns} />
 
       {rows.length === 0 ? (
         <EmptyState fund={fund} />

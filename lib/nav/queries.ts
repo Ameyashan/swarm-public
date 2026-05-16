@@ -134,6 +134,38 @@ export const getOverridesForRows = cache(
   },
 )
 
+export type BacktestRunRow = {
+  id: string
+  methodology_version: string
+  fund_ticker: string
+  start_period: string
+  end_period: string
+  positions_evaluated: number
+  quarter_pairs_evaluated: number
+  mean_abs_drift_bps: number | null
+  median_abs_drift_bps: number | null
+  p95_abs_drift_bps: number | null
+  weights_applied: Record<string, any> | null
+  notes: string | null
+  created_at: string
+}
+
+export const getBacktestRuns = cache(
+  async (fund: string, limit: number = 10): Promise<BacktestRunRow[]> => {
+    const supabase = createClient()
+    const { data, error } = await supabase
+      .from("backtest_runs")
+      .select(
+        "id, methodology_version, fund_ticker, start_period, end_period, positions_evaluated, quarter_pairs_evaluated, mean_abs_drift_bps, median_abs_drift_bps, p95_abs_drift_bps, weights_applied, notes, created_at",
+      )
+      .eq("fund_ticker", fund)
+      .order("created_at", { ascending: false })
+      .limit(limit)
+    if (error) return []
+    return (data ?? []) as BacktestRunRow[]
+  },
+)
+
 export type BiggestMover = {
   id: string
   fund_ticker: string

@@ -26,14 +26,31 @@ async function handle(req: NextRequest) {
   if (!authorized(req)) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 })
   }
-  const fund = req.nextUrl.searchParams.get("fund") ?? "GSCR"
+  // `fund=GSCR,GSBD` (default: both Goldman BDCs) — explicit comma-separated list.
+  // `fund=ALL` is sugar for the same. Single fund still supported.
+  const fundParam = req.nextUrl.searchParams.get("fund")
+  const funds = fundParam
+    ? (fundParam.toUpperCase() === "ALL"
+        ? ["GSCR", "GSBD"]
+        : fundParam.split(",").map((s) => s.trim()).filter(Boolean))
+    : ["GSCR", "GSBD"]
   const dryRun = req.nextUrl.searchParams.get("dryRun") === "1"
+  const methodology_version = req.nextUrl.searchParams.get("version") ?? undefined
   try {
-    const summary = await runDailyMarks({ fund, dryRun })
+    const results = []
+    for (const fund of funds) {
+      const summary = await runDailyMarks({ fund, dryRun, methodology_version })
+      results.push(summary)
+    }
+    const allErrors = results.flatMap((r) => r.errors)
+    const totalWritten = results.reduce((a, r) => a + r.marks_written, 0)
+    const totalSeen = results.reduce((a, r) => a + r.positions_seen, 0)
     const ok =
-      summary.errors.length === 0 &&
-      (summary.marks_written > 0 || summary.positions_seen === 0 || dryRun)
-    return NextResponse.json(summary, { status: ok ? 200 : 207 })
+      allErrors.length === 0 &&
+      (totalWritten > 0 || totalSeen === 0 || dryRun)
+    // Return single summary when only one fund requested, array otherwise.
+    const body = results.length === 1 ? results[0] : { runs: results }
+    return NextResponse.json(body, { status: ok ? 200 : 207 })
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
     return NextResponse.json({ error: message }, { status: 500 })
