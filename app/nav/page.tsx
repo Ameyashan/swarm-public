@@ -5,6 +5,7 @@ import {
   getDailyMarks,
   getLatestMarkDate,
   getOverridesForRows,
+  getTunedIndustries,
   summarize,
 } from "@/lib/nav/queries"
 import { getReconciliationStats } from "@/lib/nav/reconcile"
@@ -13,6 +14,7 @@ import { BacktestCard } from "@/components/nav/backtest-card"
 import { DailyMarksTable } from "@/components/nav/daily-marks-table"
 import { MoverTiles } from "@/components/nav/mover-tile"
 import { ReviewQueue } from "@/components/nav/review-queue"
+import { TunedIndustriesCard } from "@/components/nav/tuned-industries-card"
 
 export const revalidate = 60
 
@@ -40,9 +42,11 @@ export default async function NavPage({ searchParams }: { searchParams: SearchPa
     getReconciliationStats(fund),
     getBacktestRuns(fund, 6),
   ])
-  const [rows, overrides] = await Promise.all([
+  const tunedVersion = methodology?.version ?? "v1.1.0"
+  const [rows, overrides, tunedIndustries] = await Promise.all([
     getDailyMarks(fund, latestDate),
     getOverridesForRows(fund, latestDate),
+    getTunedIndustries(tunedVersion),
   ])
   const summary = summarize(rows)
 
@@ -73,6 +77,8 @@ export default async function NavPage({ searchParams }: { searchParams: SearchPa
       <AccuracyCard stats={accuracy} />
 
       <BacktestCard runs={backtestRuns} />
+
+      <TunedIndustriesCard rows={tunedIndustries} methodologyVersion={tunedVersion} />
 
       {rows.length === 0 ? (
         <EmptyState fund={fund} />

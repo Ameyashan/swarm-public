@@ -134,6 +134,41 @@ export const getOverridesForRows = cache(
   },
 )
 
+export type TunedIndustryRow = {
+  methodology_version: string
+  industry: string
+  w_hy: number
+  w_ll: number
+  w_sec: number
+  duration_years: number
+  alpha_dcf: number
+  fit_mean_abs_drift_bps: number | null
+  tuned_minus_baseline_bps: number | null
+  sample_size: number | null
+}
+
+// All tuned-industry overrides for a methodology_version, sorted by the
+// strongest improvement first (most negative delta = biggest accuracy gain).
+// No-improvement rows (delta = 0) sink to the bottom so they're visually
+// de-emphasized on the /nav page.
+export const getTunedIndustries = cache(
+  async (methodology_version: string): Promise<TunedIndustryRow[]> => {
+    const supabase = createClient()
+    const { data, error } = await supabase
+      .from("methodology_industry_weights")
+      .select(
+        "methodology_version, industry, w_hy, w_ll, w_sec, duration_years, alpha_dcf, fit_mean_abs_drift_bps, tuned_minus_baseline_bps, sample_size",
+      )
+      .eq("methodology_version", methodology_version)
+    if (error || !data) return []
+    return (data as TunedIndustryRow[]).slice().sort((a, b) => {
+      const da = a.tuned_minus_baseline_bps ?? 0
+      const db = b.tuned_minus_baseline_bps ?? 0
+      return da - db
+    })
+  },
+)
+
 export type BacktestRunRow = {
   id: string
   methodology_version: string
