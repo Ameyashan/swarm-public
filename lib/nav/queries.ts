@@ -134,6 +134,57 @@ export const getOverridesForRows = cache(
   },
 )
 
+export type DailyMarkHistoryPoint = {
+  mark_date: string
+  mark_pct: number | null
+  delta_bps: number | null
+  methodology_version: string
+}
+
+// History of the most recent N daily_marks per (fund, borrower). Used by the
+// /nav table to render a tiny per-row sparkline so trajectory is legible at a
+// glance without clicking into the methodology drawer.
+export const getDailyMarkHistoryByBorrower = cache(
+  async (
+    fund: string,
+    days: number = 30,
+  ): Promise<Map<string, DailyMarkHistoryPoint[]>> => {
+    const supabase = createClient()
+    const sinceIso = new Date(Date.now() - days * 86_400_000)
+      .toISOString()
+      .slice(0, 10)
+    type Row = {
+      portfolio_company_canonical: string
+      mark_date: string
+      mark_pct: number | null
+      delta_bps: number | null
+      methodology_version: string
+    }
+    const { data, error } = await supabase
+      .from("daily_marks")
+      .select(
+        "portfolio_company_canonical, mark_date, mark_pct, delta_bps, methodology_version",
+      )
+      .eq("fund_ticker", fund)
+      .gte("mark_date", sinceIso)
+      .order("mark_date", { ascending: true })
+      .limit(20_000)
+    const out = new Map<string, DailyMarkHistoryPoint[]>()
+    if (error || !data) return out
+    for (const r of data as Row[]) {
+      const arr = out.get(r.portfolio_company_canonical) ?? []
+      arr.push({
+        mark_date: r.mark_date,
+        mark_pct: r.mark_pct === null ? null : Number(r.mark_pct),
+        delta_bps: r.delta_bps === null ? null : Number(r.delta_bps),
+        methodology_version: r.methodology_version,
+      })
+      out.set(r.portfolio_company_canonical, arr)
+    }
+    return out
+  },
+)
+
 export type TunedIndustryRow = {
   methodology_version: string
   industry: string
