@@ -48,6 +48,7 @@ const MAX_ALIASES = Number(arg("max-aliases", "0")) || Infinity
 const MAX_RECORDS = Number(arg("max-records", "10"))
 
 // ─── load aliases ─────────────────────────────────────────────────────────
+async function main() {
 const sb = createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { persistSession: false } })
 const { data: aliasRows, error } = await sb
   .from("borrower_alias")
@@ -187,7 +188,14 @@ for (const s of stats.filter((s) => s.hits === 0).slice(0, 20)) {
   console.log(`  "${s.alias}"  ← ${s.canonical}  [${s.source}]`)
 }
 
+} // end main
+
 function pct(n: number, d: number): string {
   if (d === 0) return "  0%"
   return `${((n / d) * 100).toFixed(1)}%`.padStart(5)
 }
+
+main().catch((e) => {
+  console.error(e)
+  process.exit(1)
+})
