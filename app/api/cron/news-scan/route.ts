@@ -9,6 +9,7 @@ import {
 } from "@/lib/nav/news"
 import { getRecent8Ks } from "@/lib/nav/edgar"
 import { gdeltDateToIso, searchGdelt, searchTermFor } from "@/lib/nav/gdelt"
+import { searchGoogleNews } from "@/lib/nav/google_news"
 
 // News scan — runs weekdays at 14:30 UTC (30 min before mark-positions).
 // Pipeline:
@@ -35,7 +36,10 @@ import { gdeltDateToIso, searchGdelt, searchTermFor } from "@/lib/nav/gdelt"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
-export const maxDuration = 60
+// 300s is Vercel Pro's serverless ceiling. EDGAR (≤20 CIKs) + GDELT + Google
+// News run concurrently. Worst observed wall time ~4 min for the full
+// universe; tune sharding if your plan caps below 300.
+export const maxDuration = 300
 
 function authorized(req: NextRequest): boolean {
   const secret = process.env.CRON_SECRET
@@ -104,29 +108,31 @@ async function fetchEdgar8Ks(borrowers: string[], daysBack = 5): Promise<NewsIte
   return out
 }
 
-// Headline feed fetcher — GDELT DOC API. For each borrower we issue one query
-// per alias in borrower_alias (which is auto-seeded with dba/aka/fka extracts
-// and a suffix-stripped fallback). Articles are deduped by URL via the
-// news_items (source, source_id) unique constraint, so overlapping alias hits
-// collapse cleanly. If a borrower has no rows in borrower_alias we fall back
-// to searchTermFor(canonical) as a last resort.
-async function fetchHeadlines(borrowers: string[]): Promise<NewsItem[]> {
-  if (borrowers.length === 0) return []
+// Load (canonical → aliases[]) once so both headline feeds share the lookup.
+// Falls back to searchTermFor(canonical) when a borrower has no alias rows.
+async function loadAliasMap(borrowers: string[]): Promise<Map<string, string[]>> {
+  const map = new Map<string, string[]>()
+  if (borrowers.length === 0) return map
   const sb = supa()
   const { data, error } = await sb
     .from("borrower_alias")
     .select("portfolio_company_canonical, alias")
     .in("portfolio_company_canonical", borrowers)
   if (error) throw new Error(`borrower_alias load: ${error.message}`)
-  const aliasesByCanonical = new Map<string, string[]>()
   for (const r of (data ?? []) as Array<{ portfolio_company_canonical: string; alias: string }>) {
-    const list = aliasesByCanonical.get(r.portfolio_company_canonical) ?? []
+    const list = map.get(r.portfolio_company_canonical) ?? []
     list.push(r.alias)
-    aliasesByCanonical.set(r.portfolio_company_canonical, list)
+    map.set(r.portfolio_company_canonical, list)
   }
+  for (const c of borrowers) if (!map.has(c)) map.set(c, [searchTermFor(c)])
+  return map
+}
+
+// GDELT DOC API feed. One query per (borrower, alias). Articles deduped via
+// news_items (source, source_id).
+async function fetchGdelt(aliasMap: Map<string, string[]>): Promise<NewsItem[]> {
   const out: NewsItem[] = []
-  for (const canonical of borrowers) {
-    const aliases = aliasesByCanonical.get(canonical) ?? [searchTermFor(canonical)]
+  for (const [canonical, aliases] of aliasMap) {
     for (const term of aliases) {
       if (!term || term.length < 3) continue
       try {
@@ -134,7 +140,7 @@ async function fetchHeadlines(borrowers: string[]): Promise<NewsItem[]> {
         for (const a of articles) {
           out.push({
             source: "headline_feed",
-            source_id: a.url, // URL is stable per article in GDELT
+            source_id: a.url,
             portfolio_company_canonical: canonical,
             title: a.title,
             body: null,
@@ -145,6 +151,35 @@ async function fetchHeadlines(borrowers: string[]): Promise<NewsItem[]> {
         }
       } catch (err) {
         console.warn(`gdelt fetch failed for ${canonical} (alias="${term}"):`, err)
+      }
+    }
+  }
+  return out
+}
+
+// Google News RSS feed. Covers private-LBO trade-press headlines that GDELT
+// frequently misses. Same dedupe model as fetchGdelt.
+async function fetchGoogleNews(aliasMap: Map<string, string[]>): Promise<NewsItem[]> {
+  const out: NewsItem[] = []
+  for (const [canonical, aliases] of aliasMap) {
+    for (const term of aliases) {
+      if (!term || term.length < 3) continue
+      try {
+        const articles = await searchGoogleNews(term, "1d", 15)
+        for (const a of articles) {
+          out.push({
+            source: "google_news",
+            source_id: a.url,
+            portfolio_company_canonical: canonical,
+            title: a.title,
+            body: a.source_name ? `[${a.source_name}]` : null,
+            url: a.url,
+            item_codes: null,
+            published_at: a.published_at,
+          })
+        }
+      } catch (err) {
+        console.warn(`google news fetch failed for ${canonical} (alias="${term}"):`, err)
       }
     }
   }
@@ -198,10 +233,15 @@ async function handle(req: NextRequest) {
   }
   try {
     const borrowers = await loadUniverse(funds)
-    const items = [
-      ...(await fetchEdgar8Ks(borrowers)),
-      ...(await fetchHeadlines(borrowers)),
-    ]
+    const aliasMap = await loadAliasMap(borrowers)
+    // Run all three fetchers concurrently — they hit different hosts and
+    // each has its own per-host throttle, so there's no cross-interference.
+    const [edgar, gdelt, gnews] = await Promise.all([
+      fetchEdgar8Ks(borrowers),
+      fetchGdelt(aliasMap),
+      fetchGoogleNews(aliasMap),
+    ])
+    const items = [...edgar, ...gdelt, ...gnews]
     summary.items_seen = items.length
     if (items.length === 0) return NextResponse.json(summary)
 

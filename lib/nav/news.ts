@@ -7,7 +7,7 @@
 // pre-filter); this module is pure scoring.
 
 export type NewsItem = {
-  source: "edgar_8k" | "headline_feed"
+  source: "edgar_8k" | "headline_feed" | "google_news"
   source_id: string
   portfolio_company_canonical: string
   fund_ticker?: string | null

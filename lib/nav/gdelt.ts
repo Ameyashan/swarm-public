@@ -45,7 +45,18 @@ export async function searchGdelt(term: string, timespan = "1d", maxRecords = 15
   await throttle()
   const q = encodeURIComponent(`"${term}"`)
   const url = `${GDELT_DOC}?query=${q}&mode=ArtList&format=JSON&maxrecords=${maxRecords}&timespan=${timespan}&sort=DateDesc`
-  const res = await fetch(url, { headers: { Accept: "application/json" } })
+  // 10s per-request timeout — GDELT occasionally stalls and would otherwise
+  // hang the whole scan.
+  const ac = new AbortController()
+  const timer = setTimeout(() => ac.abort(), 10_000)
+  let res: Response
+  try {
+    res = await fetch(url, { headers: { Accept: "application/json" }, signal: ac.signal })
+  } catch {
+    return []
+  } finally {
+    clearTimeout(timer)
+  }
   if (!res.ok) return []
   // GDELT sometimes returns empty body or non-JSON on no-hit queries.
   const text = await res.text()

@@ -12,7 +12,6 @@
 //
 // Reads .env.local automatically if present.
 
-import { createClient } from "@supabase/supabase-js"
 import { readFileSync, existsSync } from "node:fs"
 import { join } from "node:path"
 import {
@@ -47,20 +46,27 @@ const TIMESPAN = arg("timespan", "7d")
 const MAX_ALIASES = Number(arg("max-aliases", "0")) || Infinity
 const MAX_RECORDS = Number(arg("max-records", "10"))
 
-// ─── load aliases ─────────────────────────────────────────────────────────
-const sb = createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { persistSession: false } })
-const { data: aliasRows, error } = await sb
-  .from("borrower_alias")
-  .select("portfolio_company_canonical, alias, source")
-if (error) {
-  console.error("supabase load failed:", error.message)
+// ─── load aliases via Supabase REST (avoids @supabase/supabase-js's
+//     realtime-ws dependency that breaks on Node 20 sans native WebSocket) ─
+async function main() {
+const url = `${SUPABASE_URL.replace(/\/$/, "")}/rest/v1/borrower_alias?select=portfolio_company_canonical,alias,source`
+const res = await fetch(url, {
+  headers: {
+    apikey: SUPABASE_KEY,
+    Authorization: `Bearer ${SUPABASE_KEY}`,
+    Accept: "application/json",
+  },
+})
+if (!res.ok) {
+  console.error(`supabase load failed: HTTP ${res.status} — ${await res.text()}`)
   process.exit(1)
 }
-const aliases = (aliasRows ?? []).slice(0, MAX_ALIASES) as Array<{
+const aliasRows = (await res.json()) as Array<{
   portfolio_company_canonical: string
   alias: string
   source: string
 }>
+const aliases = aliasRows.slice(0, MAX_ALIASES)
 console.error(`loaded ${aliases.length} aliases · timespan=${TIMESPAN} · max-records=${MAX_RECORDS}`)
 
 // ─── walk + classify ──────────────────────────────────────────────────────
@@ -115,9 +121,11 @@ for (const row of aliases) {
     samples,
   })
   done++
-  if (done % 25 === 0) {
+  // Progress every 5 (small runs) or every 25 (big runs)
+  const tick = aliases.length <= 100 ? 5 : 25
+  if (done % tick === 0 || done === aliases.length) {
     const rate = done / ((Date.now() - t0) / 1000)
-    console.error(`  ${done}/${aliases.length} (${rate.toFixed(1)}/s) — eta ${((aliases.length - done) / rate).toFixed(0)}s`)
+    console.error(`  ${done}/${aliases.length} (${rate.toFixed(1)}/s) — eta ${Math.max(0, ((aliases.length - done) / rate)).toFixed(0)}s`)
   }
 }
 
@@ -187,7 +195,14 @@ for (const s of stats.filter((s) => s.hits === 0).slice(0, 20)) {
   console.log(`  "${s.alias}"  ← ${s.canonical}  [${s.source}]`)
 }
 
+} // end main
+
 function pct(n: number, d: number): string {
   if (d === 0) return "  0%"
   return `${((n / d) * 100).toFixed(1)}%`.padStart(5)
 }
+
+main().catch((e) => {
+  console.error(e)
+  process.exit(1)
+})
