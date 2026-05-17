@@ -1,6 +1,10 @@
 {
   "crons": [
     {
+      "path": "/api/cron/news-scan",
+      "schedule": "30 14 * * 1-5"
+    },
+    {
       "path": "/api/cron/mark-positions",
       "schedule": "0 15 * * 1-5"
     }
