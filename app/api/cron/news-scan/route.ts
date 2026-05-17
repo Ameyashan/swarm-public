@@ -104,30 +104,48 @@ async function fetchEdgar8Ks(borrowers: string[], daysBack = 5): Promise<NewsIte
   return out
 }
 
-// Headline feed fetcher — GDELT DOC API, one query per borrower with a
-// suffix-stripped search term. Articles are deduped by URL via the
-// news_items (source, source_id) unique constraint.
+// Headline feed fetcher — GDELT DOC API. For each borrower we issue one query
+// per alias in borrower_alias (which is auto-seeded with dba/aka/fka extracts
+// and a suffix-stripped fallback). Articles are deduped by URL via the
+// news_items (source, source_id) unique constraint, so overlapping alias hits
+// collapse cleanly. If a borrower has no rows in borrower_alias we fall back
+// to searchTermFor(canonical) as a last resort.
 async function fetchHeadlines(borrowers: string[]): Promise<NewsItem[]> {
+  if (borrowers.length === 0) return []
+  const sb = supa()
+  const { data, error } = await sb
+    .from("borrower_alias")
+    .select("portfolio_company_canonical, alias")
+    .in("portfolio_company_canonical", borrowers)
+  if (error) throw new Error(`borrower_alias load: ${error.message}`)
+  const aliasesByCanonical = new Map<string, string[]>()
+  for (const r of (data ?? []) as Array<{ portfolio_company_canonical: string; alias: string }>) {
+    const list = aliasesByCanonical.get(r.portfolio_company_canonical) ?? []
+    list.push(r.alias)
+    aliasesByCanonical.set(r.portfolio_company_canonical, list)
+  }
   const out: NewsItem[] = []
   for (const canonical of borrowers) {
-    const term = searchTermFor(canonical)
-    if (term.length < 3) continue
-    try {
-      const articles = await searchGdelt(term, "1d", 15)
-      for (const a of articles) {
-        out.push({
-          source: "headline_feed",
-          source_id: a.url, // URL is stable per article in GDELT
-          portfolio_company_canonical: canonical,
-          title: a.title,
-          body: null,
-          url: a.url,
-          item_codes: null,
-          published_at: gdeltDateToIso(a.seendate),
-        })
+    const aliases = aliasesByCanonical.get(canonical) ?? [searchTermFor(canonical)]
+    for (const term of aliases) {
+      if (!term || term.length < 3) continue
+      try {
+        const articles = await searchGdelt(term, "1d", 15)
+        for (const a of articles) {
+          out.push({
+            source: "headline_feed",
+            source_id: a.url, // URL is stable per article in GDELT
+            portfolio_company_canonical: canonical,
+            title: a.title,
+            body: null,
+            url: a.url,
+            item_codes: null,
+            published_at: gdeltDateToIso(a.seendate),
+          })
+        }
+      } catch (err) {
+        console.warn(`gdelt fetch failed for ${canonical} (alias="${term}"):`, err)
       }
-    } catch (err) {
-      console.warn(`gdelt fetch failed for ${canonical}:`, err)
     }
   }
   return out
