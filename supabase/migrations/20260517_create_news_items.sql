@@ -28,3 +28,5 @@ create index if not exists news_items_borrower_published_idx
 
 create index if not exists news_items_published_idx
   on news_items (published_at desc);
+
+alter table news_items enable row level security;

@@ -14,3 +14,5 @@ create table if not exists borrower_cik (
 );
 
 create index if not exists borrower_cik_cik_idx on borrower_cik (cik);
+
+alter table borrower_cik enable row level security;
