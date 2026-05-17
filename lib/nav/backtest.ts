@@ -147,6 +147,7 @@ export async function runBacktest(opts: BacktestOpts = {}): Promise<BacktestSumm
       "portfolio_company_canonical, benchmark_code, weight, duration_years, alpha_dcf",
     )
     .eq("fund_ticker", fund)
+    .limit(20_000)
   if (mapErr) errors.push(`load map: ${mapErr.message}`)
 
   type MapRow = {

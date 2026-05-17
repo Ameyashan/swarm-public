@@ -118,6 +118,7 @@ export async function runDailyMarks(opts: {
     .from("position_benchmark_map")
     .select("fund_ticker, portfolio_company_canonical, benchmark_code, weight, duration_years, alpha_dcf")
     .eq("fund_ticker", fund)
+    .limit(20_000)
   if (mapErr) {
     summary.errors.push(`load map: ${mapErr.message}`)
     return summary
@@ -179,7 +180,7 @@ export async function runDailyMarks(opts: {
     .eq("fund_ticker", fund)
     .in("portfolio_company_canonical", borrowers)
     .order("period_end", { ascending: false })
-    .limit(4000)
+    .limit(20_000)
   if (obsErr) {
     summary.errors.push(`load observations: ${obsErr.message}`)
     return summary

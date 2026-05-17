@@ -86,6 +86,7 @@ export async function runReconciliation(opts: {
     .from("position_benchmark_map")
     .select("portfolio_company_canonical")
     .eq("fund_ticker", fund)
+    .limit(20_000)
   if (mapErr) {
     summary.errors.push(`load map: ${mapErr.message}`)
     return summary
@@ -103,7 +104,7 @@ export async function runReconciliation(opts: {
     .eq("fund_ticker", fund)
     .in("portfolio_company_canonical", borrowers)
     .order("period_end", { ascending: false })
-    .limit(4000)
+    .limit(20_000)
   if (obsErr) {
     summary.errors.push(`load observations: ${obsErr.message}`)
     return summary
@@ -139,7 +140,7 @@ export async function runReconciliation(opts: {
     .eq("methodology_version", methodology_version)
     .in("portfolio_company_canonical", borrowers)
     .order("mark_date", { ascending: false })
-    .limit(4000)
+    .limit(20_000)
   if (marksErr) {
     summary.errors.push(`load daily_marks: ${marksErr.message}`)
     return summary
