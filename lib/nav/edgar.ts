@@ -4,7 +4,7 @@
 
 const EDGAR_BASE = "https://data.sec.gov"
 const ARCHIVES_BASE = "https://www.sec.gov/Archives"
-const USER_AGENT = process.env.EDGAR_USER_AGENT ?? "Swarm Public ameya@swarmpublic.com"
+const USER_AGENT = process.env.EDGAR_USER_AGENT ?? "Swarm Public ameya.shanbhag@gmail.com"
 
 const MIN_INTERVAL_MS = 150
 let lastAt = 0
