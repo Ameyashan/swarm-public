@@ -8,6 +8,7 @@
 
 export type NewsItem = {
   source: "edgar_8k" | "headline_feed"
+  source_id: string
   portfolio_company_canonical: string
   fund_ticker?: string | null
   title: string

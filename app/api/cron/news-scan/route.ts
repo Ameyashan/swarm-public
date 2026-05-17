@@ -7,6 +7,8 @@ import {
   type NewsItem,
   type Score,
 } from "@/lib/nav/news"
+import { getRecent8Ks } from "@/lib/nav/edgar"
+import { gdeltDateToIso, searchGdelt, searchTermFor } from "@/lib/nav/gdelt"
 
 // News scan — runs weekdays at 14:30 UTC (30 min before mark-positions).
 // Pipeline:
@@ -62,22 +64,73 @@ async function loadUniverse(funds: string[]): Promise<string[]> {
   return Array.from(new Set((data ?? []).map((r: any) => r.portfolio_company_canonical)))
 }
 
-// ─── STUB ── EDGAR 8-K fetcher ────────────────────────────────────────────
-async function fetchEdgar8Ks(_borrowers: string[]): Promise<NewsItem[]> {
-  // TODO: borrower → CIK lookup, then EDGAR submissions JSON + 8-K parsing
-  // to extract item_codes. See python-pipeline/edgar_client.py for the
-  // rate-limit + User-Agent pattern that already works.
-  return []
+// EDGAR 8-K fetcher. Pulls borrower→CIK rows then walks recent submissions
+// for each CIK, keeping 8-Ks filed within `daysBack`. Empty universe (no
+// borrower_cik rows) returns [] silently — that's the normal state until
+// the table is seeded.
+async function fetchEdgar8Ks(borrowers: string[], daysBack = 5): Promise<NewsItem[]> {
+  if (borrowers.length === 0) return []
+  const sb = supa()
+  const { data, error } = await sb
+    .from("borrower_cik")
+    .select("portfolio_company_canonical, cik")
+    .in("portfolio_company_canonical", borrowers)
+  if (error) throw new Error(`borrower_cik load: ${error.message}`)
+  const rows = (data ?? []) as Array<{ portfolio_company_canonical: string; cik: string }>
+  if (rows.length === 0) return []
+  const since = new Date(Date.now() - daysBack * 86_400_000).toISOString().slice(0, 10)
+  const out: NewsItem[] = []
+  for (const r of rows) {
+    try {
+      const filings = await getRecent8Ks(r.cik, since, 20)
+      for (const f of filings) {
+        out.push({
+          source: "edgar_8k",
+          source_id: f.accession_number,
+          portfolio_company_canonical: r.portfolio_company_canonical,
+          title: `8-K filed ${f.filing_date}${f.items.length ? ` — items ${f.items.join(", ")}` : ""}`,
+          body: null,
+          url: f.url,
+          item_codes: f.items,
+          published_at: `${f.filing_date}T00:00:00Z`,
+        })
+      }
+    } catch (err) {
+      // Swallow per-borrower errors so one bad CIK doesn't kill the whole scan.
+      // The summary surfaces these via items_seen vs. items_inserted skew.
+      console.warn(`edgar fetch failed for ${r.portfolio_company_canonical}:`, err)
+    }
+  }
+  return out
 }
 
-// ─── STUB ── Headline feed fetcher (GDELT default) ────────────────────────
-async function fetchHeadlines(_borrowers: string[]): Promise<NewsItem[]> {
-  // TODO: GDELT DOC API — https://api.gdeltproject.org/api/v2/doc/doc
-  // Query per borrower (or batched OR-query) with mode=ArtList, format=JSON,
-  // timespan=1d. Map article.title → NewsItem, dedupe by article.url as
-  // source_id. Borrower matching needs alias logic; reuse the canonical name
-  // resolution used elsewhere in the pipeline.
-  return []
+// Headline feed fetcher — GDELT DOC API, one query per borrower with a
+// suffix-stripped search term. Articles are deduped by URL via the
+// news_items (source, source_id) unique constraint.
+async function fetchHeadlines(borrowers: string[]): Promise<NewsItem[]> {
+  const out: NewsItem[] = []
+  for (const canonical of borrowers) {
+    const term = searchTermFor(canonical)
+    if (term.length < 3) continue
+    try {
+      const articles = await searchGdelt(term, "1d", 15)
+      for (const a of articles) {
+        out.push({
+          source: "headline_feed",
+          source_id: a.url, // URL is stable per article in GDELT
+          portfolio_company_canonical: canonical,
+          title: a.title,
+          body: null,
+          url: a.url,
+          item_codes: null,
+          published_at: gdeltDateToIso(a.seendate),
+        })
+      }
+    } catch (err) {
+      console.warn(`gdelt fetch failed for ${canonical}:`, err)
+    }
+  }
+  return out
 }
 
 async function callClaude(prompt: string): Promise<string> {
@@ -146,7 +199,7 @@ async function handle(req: NextRequest) {
     // Score + write detector_hits for severity ≥ 70.
     const hits: Array<Record<string, any>> = []
     for (const row of fresh) {
-      const item = items.find((i) => i.source === row.source && (i as any).source_id === row.source_id)
+      const item = items.find((i) => i.source === row.source && i.source_id === row.source_id)
       if (!item) continue
       const s = await scoreItem(item)
       if (s.method === "llm") summary.llm_calls++
