@@ -12,7 +12,6 @@
 //
 // Reads .env.local automatically if present.
 
-import { createClient } from "@supabase/supabase-js"
 import { readFileSync, existsSync } from "node:fs"
 import { join } from "node:path"
 import {
@@ -47,21 +46,27 @@ const TIMESPAN = arg("timespan", "7d")
 const MAX_ALIASES = Number(arg("max-aliases", "0")) || Infinity
 const MAX_RECORDS = Number(arg("max-records", "10"))
 
-// ─── load aliases ─────────────────────────────────────────────────────────
+// ─── load aliases via Supabase REST (avoids @supabase/supabase-js's
+//     realtime-ws dependency that breaks on Node 20 sans native WebSocket) ─
 async function main() {
-const sb = createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { persistSession: false } })
-const { data: aliasRows, error } = await sb
-  .from("borrower_alias")
-  .select("portfolio_company_canonical, alias, source")
-if (error) {
-  console.error("supabase load failed:", error.message)
+const url = `${SUPABASE_URL.replace(/\/$/, "")}/rest/v1/borrower_alias?select=portfolio_company_canonical,alias,source`
+const res = await fetch(url, {
+  headers: {
+    apikey: SUPABASE_KEY,
+    Authorization: `Bearer ${SUPABASE_KEY}`,
+    Accept: "application/json",
+  },
+})
+if (!res.ok) {
+  console.error(`supabase load failed: HTTP ${res.status} — ${await res.text()}`)
   process.exit(1)
 }
-const aliases = (aliasRows ?? []).slice(0, MAX_ALIASES) as Array<{
+const aliasRows = (await res.json()) as Array<{
   portfolio_company_canonical: string
   alias: string
   source: string
 }>
+const aliases = aliasRows.slice(0, MAX_ALIASES)
 console.error(`loaded ${aliases.length} aliases · timespan=${TIMESPAN} · max-records=${MAX_RECORDS}`)
 
 // ─── walk + classify ──────────────────────────────────────────────────────
