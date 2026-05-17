@@ -121,9 +121,11 @@ for (const row of aliases) {
     samples,
   })
   done++
-  if (done % 25 === 0) {
+  // Progress every 5 (small runs) or every 25 (big runs)
+  const tick = aliases.length <= 100 ? 5 : 25
+  if (done % tick === 0 || done === aliases.length) {
     const rate = done / ((Date.now() - t0) / 1000)
-    console.error(`  ${done}/${aliases.length} (${rate.toFixed(1)}/s) — eta ${((aliases.length - done) / rate).toFixed(0)}s`)
+    console.error(`  ${done}/${aliases.length} (${rate.toFixed(1)}/s) — eta ${Math.max(0, ((aliases.length - done) / rate)).toFixed(0)}s`)
   }
 }
 
