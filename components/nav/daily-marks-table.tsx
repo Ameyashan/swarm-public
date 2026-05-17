@@ -120,7 +120,7 @@ function PillarBar({ row }: { row: DailyMarkRow }) {
   )
 }
 
-type SortKey = "delta_bps" | "borrower" | "fair_value" | "mark_pct" | "confidence"
+type SortKey = "delta_bps" | "borrower" | "fund" | "fair_value" | "mark_pct" | "confidence" | "flag"
 type SortDir = "asc" | "desc"
 
 export function DailyMarksTable({
@@ -163,12 +163,20 @@ export function DailyMarksTable({
           av = a.portfolio_company_canonical.toLowerCase()
           bv = b.portfolio_company_canonical.toLowerCase()
           break
+        case "fund":
+          av = a.fund_ticker.toLowerCase()
+          bv = b.fund_ticker.toLowerCase()
+          break
         case "fair_value":
           av = a.fair_value_estimated; bv = b.fair_value_estimated; break
         case "mark_pct":
           av = a.mark_pct ?? -Infinity; bv = b.mark_pct ?? -Infinity; break
         case "confidence":
           av = a.confidence; bv = b.confidence; break
+        case "flag":
+          av = a.requires_review ? 1 : 0
+          bv = b.requires_review ? 1 : 0
+          break
       }
       if (typeof av === "number" && typeof bv === "number") return (av - bv) * dir
       return String(av).localeCompare(String(bv)) * dir
@@ -177,7 +185,7 @@ export function DailyMarksTable({
 
   function toggleSort(k: SortKey) {
     if (k === sortKey) setSortDir(sortDir === "asc" ? "desc" : "asc")
-    else { setSortKey(k); setSortDir(k === "borrower" ? "asc" : "desc") }
+    else { setSortKey(k); setSortDir(k === "borrower" || k === "fund" ? "asc" : "desc") }
   }
 
   function HeaderCell({
@@ -223,6 +231,7 @@ export function DailyMarksTable({
           <thead style={{ background: "var(--bg-1)" }}>
             <tr style={{ borderBottom: "0.5px solid var(--line)" }}>
               <HeaderCell k="borrower" label="borrower" />
+              <HeaderCell k="fund" label="fund" />
               <th scope="col" className="px-3 py-2 text-left font-mono text-[10.5px] uppercase tracking-[0.1em]" style={{ color: "var(--text-faint)" }}>
                 pillars
               </th>
@@ -233,9 +242,7 @@ export function DailyMarksTable({
               <HeaderCell k="delta_bps" label="Δ bps" align="right" />
               <HeaderCell k="mark_pct" label="mark %" align="right" />
               <HeaderCell k="confidence" label="conf" align="right" />
-              <th scope="col" className="px-3 py-2 text-right font-mono text-[10.5px] uppercase tracking-[0.1em]" style={{ color: "var(--text-faint)" }}>
-                flag
-              </th>
+              <HeaderCell k="flag" label="flag" align="right" />
             </tr>
           </thead>
           <tbody>
@@ -261,6 +268,9 @@ export function DailyMarksTable({
                         </span>
                       ) : null}
                     </div>
+                  </td>
+                  <td className="px-3 py-2 font-mono text-[11.5px] uppercase tracking-[0.04em] text-text-dim">
+                    {r.fund_ticker}
                   </td>
                   <td className="px-3 py-2"><PillarBar row={r} /></td>
                   <td className="px-3 py-2">
@@ -302,7 +312,7 @@ export function DailyMarksTable({
             })}
             {filtered.length === 0 && (
               <tr>
-                <td colSpan={8} className="px-3 py-6 text-center font-mono text-[11.5px] text-text-faint">
+                <td colSpan={9} className="px-3 py-6 text-center font-mono text-[11.5px] text-text-faint">
                   no rows match this filter
                 </td>
               </tr>

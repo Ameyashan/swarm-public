@@ -18,7 +18,10 @@ function fmtPct(n: number | null | undefined, digits = 2): string {
 
 function fmtNum(n: number | null | undefined, digits = 4): string {
   if (n === null || n === undefined || !Number.isFinite(n)) return "—"
-  return n.toFixed(digits)
+  return n.toLocaleString("en-US", {
+    minimumFractionDigits: digits,
+    maximumFractionDigits: digits,
+  })
 }
 
 export function MethodologyDrawer({
